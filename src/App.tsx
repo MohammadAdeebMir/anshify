@@ -13,6 +13,8 @@ import LibraryPage from "./pages/LibraryPage";
 import AuthPage from "./pages/AuthPage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
 import ProfilePage from "./pages/ProfilePage";
+import ArtistPage from "./pages/ArtistPage";
+import AlbumPage from "./pages/AlbumPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -32,6 +34,8 @@ const App = () => (
                 <Route path="/browse" element={<BrowsePage />} />
                 <Route path="/library" element={<LibraryPage />} />
                 <Route path="/profile" element={<ProfilePage />} />
+                <Route path="/artist/:id" element={<ArtistPage />} />
+                <Route path="/album/:id" element={<AlbumPage />} />
               </Route>
               <Route path="/auth" element={<AuthPage />} />
               <Route path="/reset-password" element={<ResetPasswordPage />} />

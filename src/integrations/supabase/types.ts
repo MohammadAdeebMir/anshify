@@ -14,6 +14,137 @@ export type Database = {
   }
   public: {
     Tables: {
+      liked_songs: {
+        Row: {
+          album_id: string
+          album_image: string
+          album_name: string
+          artist_id: string
+          artist_name: string
+          audio: string
+          created_at: string
+          duration: number
+          id: string
+          track_id: string
+          track_name: string
+          user_id: string
+        }
+        Insert: {
+          album_id?: string
+          album_image?: string
+          album_name?: string
+          artist_id: string
+          artist_name: string
+          audio?: string
+          created_at?: string
+          duration?: number
+          id?: string
+          track_id: string
+          track_name: string
+          user_id: string
+        }
+        Update: {
+          album_id?: string
+          album_image?: string
+          album_name?: string
+          artist_id?: string
+          artist_name?: string
+          audio?: string
+          created_at?: string
+          duration?: number
+          id?: string
+          track_id?: string
+          track_name?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      playlist_songs: {
+        Row: {
+          added_at: string
+          album_id: string
+          album_image: string
+          album_name: string
+          artist_id: string
+          artist_name: string
+          audio: string
+          duration: number
+          id: string
+          playlist_id: string
+          position: number
+          track_id: string
+          track_name: string
+          user_id: string
+        }
+        Insert: {
+          added_at?: string
+          album_id?: string
+          album_image?: string
+          album_name?: string
+          artist_id: string
+          artist_name: string
+          audio?: string
+          duration?: number
+          id?: string
+          playlist_id: string
+          position?: number
+          track_id: string
+          track_name: string
+          user_id: string
+        }
+        Update: {
+          added_at?: string
+          album_id?: string
+          album_image?: string
+          album_name?: string
+          artist_id?: string
+          artist_name?: string
+          audio?: string
+          duration?: number
+          id?: string
+          playlist_id?: string
+          position?: number
+          track_id?: string
+          track_name?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "playlist_songs_playlist_id_fkey"
+            columns: ["playlist_id"]
+            isOneToOne: false
+            referencedRelation: "playlists"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      playlists: {
+        Row: {
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -37,6 +168,51 @@ export type Database = {
           display_name?: string | null
           id?: string
           updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      recently_played: {
+        Row: {
+          album_id: string
+          album_image: string
+          album_name: string
+          artist_id: string
+          artist_name: string
+          audio: string
+          duration: number
+          id: string
+          played_at: string
+          track_id: string
+          track_name: string
+          user_id: string
+        }
+        Insert: {
+          album_id?: string
+          album_image?: string
+          album_name?: string
+          artist_id: string
+          artist_name: string
+          audio?: string
+          duration?: number
+          id?: string
+          played_at?: string
+          track_id: string
+          track_name: string
+          user_id: string
+        }
+        Update: {
+          album_id?: string
+          album_image?: string
+          album_name?: string
+          artist_id?: string
+          artist_name?: string
+          audio?: string
+          duration?: number
+          id?: string
+          played_at?: string
+          track_id?: string
+          track_name?: string
           user_id?: string
         }
         Relationships: []

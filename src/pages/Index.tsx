@@ -1,9 +1,12 @@
 import { useQuery } from '@tanstack/react-query';
+import { Link } from 'react-router-dom';
 import { AlbumGridSkeleton, SongListSkeleton, ArtistGridSkeleton } from '@/components/skeletons/Skeletons';
-import { Music2, TrendingUp, Clock, Star, Play } from 'lucide-react';
+import { Music2, TrendingUp, Star, Play, Heart } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { getTrendingTracks, getNewReleases, getPopularArtists } from '@/services/jamendo';
 import { usePlayer } from '@/contexts/PlayerContext';
+import { useAuth } from '@/hooks/useAuth';
+import { useLikedSongs, useLikeTrack } from '@/hooks/useLibrary';
 import { Track } from '@/types/music';
 
 const fadeIn = {
@@ -24,38 +27,51 @@ const Section = ({ title, icon: Icon, children }: { title: string; icon: React.E
 
 const TrackRow = ({ track, index, tracks }: { track: Track; index: number; tracks: Track[] }) => {
   const { play, currentTrack, isPlaying } = usePlayer();
+  const { user } = useAuth();
+  const { likedSongs } = useLikedSongs();
+  const { isLiked, toggleLike } = useLikeTrack();
   const isActive = currentTrack?.id === track.id;
+  const liked = isLiked(track.id, likedSongs);
 
   return (
-    <button
-      onClick={() => play(track, tracks)}
-      className={`flex items-center gap-3 p-3 w-full text-left rounded-lg transition-colors hover:bg-muted/40 ${isActive ? 'bg-primary/10' : ''}`}
-    >
-      <div className="relative h-10 w-10 rounded-md overflow-hidden flex-shrink-0">
-        <img src={track.album_image} alt={track.album_name} className="h-full w-full object-cover" />
-        {isActive && isPlaying && (
-          <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-            <div className="flex gap-0.5">
-              {[1, 2, 3].map(i => (
-                <span key={i} className="w-0.5 bg-primary animate-pulse rounded-full" style={{ height: `${8 + i * 3}px`, animationDelay: `${i * 0.15}s` }} />
-              ))}
+    <div className={`flex items-center gap-3 p-3 rounded-lg transition-colors hover:bg-muted/40 ${isActive ? 'bg-primary/10' : ''}`}>
+      <button onClick={() => play(track, tracks)} className="flex items-center gap-3 flex-1 min-w-0 text-left">
+        <div className="relative h-10 w-10 rounded-md overflow-hidden flex-shrink-0">
+          <img src={track.album_image} alt={track.album_name} className="h-full w-full object-cover" />
+          {isActive && isPlaying && (
+            <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+              <div className="flex gap-0.5">
+                {[1, 2, 3].map(i => (
+                  <span key={i} className="w-0.5 bg-primary animate-pulse rounded-full" style={{ height: `${8 + i * 3}px`, animationDelay: `${i * 0.15}s` }} />
+                ))}
+              </div>
             </div>
-          </div>
-        )}
-      </div>
-      <div className="flex-1 min-w-0">
-        <p className={`text-sm font-medium truncate ${isActive ? 'text-primary' : 'text-foreground'}`}>{track.name}</p>
-        <p className="text-xs text-muted-foreground truncate">{track.artist_name}</p>
-      </div>
+          )}
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className={`text-sm font-medium truncate ${isActive ? 'text-primary' : 'text-foreground'}`}>{track.name}</p>
+          <Link to={`/artist/${track.artist_id}`} onClick={e => e.stopPropagation()} className="text-xs text-muted-foreground truncate hover:underline block">
+            {track.artist_name}
+          </Link>
+        </div>
+      </button>
+      {user && (
+        <button
+          onClick={() => toggleLike.mutate({ track, liked })}
+          className={`p-1.5 rounded-full transition-colors ${liked ? 'text-primary' : 'text-muted-foreground hover:text-foreground'}`}
+        >
+          <Heart className={`h-4 w-4 ${liked ? 'fill-current' : ''}`} />
+        </button>
+      )}
       <span className="text-xs text-muted-foreground tabular-nums">
         {Math.floor(track.duration / 60)}:{String(track.duration % 60).padStart(2, '0')}
       </span>
-    </button>
+    </div>
   );
 };
 
 const AlbumCard = ({ album }: { album: any }) => (
-  <div className="group space-y-3 p-3 rounded-xl transition-colors hover:bg-muted/30 cursor-pointer">
+  <Link to={`/album/${album.id}`} className="group space-y-3 p-3 rounded-xl transition-colors hover:bg-muted/30">
     <div className="relative aspect-square w-full rounded-xl overflow-hidden">
       <img src={album.image} alt={album.name} className="h-full w-full object-cover transition-transform group-hover:scale-105" loading="lazy" />
       <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
@@ -66,16 +82,16 @@ const AlbumCard = ({ album }: { album: any }) => (
     </div>
     <p className="text-sm font-medium text-foreground truncate">{album.name}</p>
     <p className="text-xs text-muted-foreground truncate">{album.artist_name}</p>
-  </div>
+  </Link>
 );
 
 const ArtistCard = ({ artist }: { artist: any }) => (
-  <div className="flex flex-col items-center space-y-3 p-4 rounded-xl hover:bg-muted/30 transition-colors cursor-pointer">
+  <Link to={`/artist/${artist.id}`} className="flex flex-col items-center space-y-3 p-4 rounded-xl hover:bg-muted/30 transition-colors">
     <div className="h-28 w-28 rounded-full overflow-hidden">
       <img src={artist.image} alt={artist.name} className="h-full w-full object-cover" loading="lazy" />
     </div>
     <p className="text-sm font-medium text-foreground text-center truncate w-full">{artist.name}</p>
-  </div>
+  </Link>
 );
 
 const Index = () => {

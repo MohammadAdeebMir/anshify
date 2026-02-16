@@ -126,7 +126,7 @@ export async function getAlbumTracks(albumId: string): Promise<Track[]> {
   const results = await jamendoCall<any>('tracks', {
     album_id: albumId,
     audioformat: 'mp32',
-    order: 'position_asc',
+    order: 'relevance',
   });
   return results.map(mapTrack);
 }

@@ -1,6 +1,10 @@
+import { useQuery } from '@tanstack/react-query';
 import { AlbumGridSkeleton, SongListSkeleton, ArtistGridSkeleton } from '@/components/skeletons/Skeletons';
-import { Music2, TrendingUp, Clock, Star } from 'lucide-react';
+import { Music2, TrendingUp, Clock, Star, Play } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { getTrendingTracks, getNewReleases, getPopularArtists } from '@/services/jamendo';
+import { usePlayer } from '@/contexts/PlayerContext';
+import { Track } from '@/types/music';
 
 const fadeIn = {
   initial: { opacity: 0, y: 16 },
@@ -18,44 +22,117 @@ const Section = ({ title, icon: Icon, children }: { title: string; icon: React.E
   </motion.section>
 );
 
+const TrackRow = ({ track, index, tracks }: { track: Track; index: number; tracks: Track[] }) => {
+  const { play, currentTrack, isPlaying } = usePlayer();
+  const isActive = currentTrack?.id === track.id;
+
+  return (
+    <button
+      onClick={() => play(track, tracks)}
+      className={`flex items-center gap-3 p-3 w-full text-left rounded-lg transition-colors hover:bg-muted/40 ${isActive ? 'bg-primary/10' : ''}`}
+    >
+      <div className="relative h-10 w-10 rounded-md overflow-hidden flex-shrink-0">
+        <img src={track.album_image} alt={track.album_name} className="h-full w-full object-cover" />
+        {isActive && isPlaying && (
+          <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
+            <div className="flex gap-0.5">
+              {[1, 2, 3].map(i => (
+                <span key={i} className="w-0.5 bg-primary animate-pulse rounded-full" style={{ height: `${8 + i * 3}px`, animationDelay: `${i * 0.15}s` }} />
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className={`text-sm font-medium truncate ${isActive ? 'text-primary' : 'text-foreground'}`}>{track.name}</p>
+        <p className="text-xs text-muted-foreground truncate">{track.artist_name}</p>
+      </div>
+      <span className="text-xs text-muted-foreground tabular-nums">
+        {Math.floor(track.duration / 60)}:{String(track.duration % 60).padStart(2, '0')}
+      </span>
+    </button>
+  );
+};
+
+const AlbumCard = ({ album }: { album: any }) => (
+  <div className="group space-y-3 p-3 rounded-xl transition-colors hover:bg-muted/30 cursor-pointer">
+    <div className="relative aspect-square w-full rounded-xl overflow-hidden">
+      <img src={album.image} alt={album.name} className="h-full w-full object-cover transition-transform group-hover:scale-105" loading="lazy" />
+      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
+        <div className="h-10 w-10 rounded-full bg-primary flex items-center justify-center shadow-lg">
+          <Play className="h-5 w-5 text-primary-foreground fill-current" />
+        </div>
+      </div>
+    </div>
+    <p className="text-sm font-medium text-foreground truncate">{album.name}</p>
+    <p className="text-xs text-muted-foreground truncate">{album.artist_name}</p>
+  </div>
+);
+
+const ArtistCard = ({ artist }: { artist: any }) => (
+  <div className="flex flex-col items-center space-y-3 p-4 rounded-xl hover:bg-muted/30 transition-colors cursor-pointer">
+    <div className="h-28 w-28 rounded-full overflow-hidden">
+      <img src={artist.image} alt={artist.name} className="h-full w-full object-cover" loading="lazy" />
+    </div>
+    <p className="text-sm font-medium text-foreground text-center truncate w-full">{artist.name}</p>
+  </div>
+);
+
 const Index = () => {
+  const { data: trending, isLoading: loadingTrending } = useQuery({
+    queryKey: ['trending-tracks'],
+    queryFn: () => getTrendingTracks(10),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const { data: newReleases, isLoading: loadingReleases } = useQuery({
+    queryKey: ['new-releases'],
+    queryFn: () => getNewReleases(6),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const { data: artists, isLoading: loadingArtists } = useQuery({
+    queryKey: ['popular-artists'],
+    queryFn: () => getPopularArtists(6),
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const hours = new Date().getHours();
+  const greeting = hours < 12 ? 'Good morning' : hours < 18 ? 'Good afternoon' : 'Good evening';
+
   return (
     <div className="p-6 md:p-8 space-y-10 max-w-7xl mx-auto">
-      {/* Hero */}
-      <motion.div
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-        className="space-y-2"
-      >
-        <h1 className="text-3xl md:text-4xl font-extrabold text-foreground glow-text">
-          Good evening
-        </h1>
-        <p className="text-muted-foreground text-sm">
-          Discover new music and enjoy your favorites
-        </p>
+      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="space-y-2">
+        <h1 className="text-3xl md:text-4xl font-extrabold text-foreground glow-text">{greeting}</h1>
+        <p className="text-muted-foreground text-sm">Discover new music and enjoy your favorites</p>
       </motion.div>
 
-      {/* Featured / Trending */}
       <Section title="Trending Now" icon={TrendingUp}>
-        <AlbumGridSkeleton count={6} />
+        {loadingTrending ? (
+          <div className="glass rounded-2xl overflow-hidden"><SongListSkeleton count={5} /></div>
+        ) : (
+          <div className="glass rounded-2xl overflow-hidden">
+            {trending?.map((track, i) => (
+              <TrackRow key={track.id} track={track} index={i} tracks={trending} />
+            ))}
+          </div>
+        )}
       </Section>
 
-      {/* Recently Played */}
-      <Section title="Recently Played" icon={Clock}>
-        <div className="glass rounded-2xl overflow-hidden">
-          <SongListSkeleton count={5} />
-        </div>
-      </Section>
-
-      {/* Popular Artists */}
       <Section title="Popular Artists" icon={Star}>
-        <ArtistGridSkeleton count={6} />
+        {loadingArtists ? <ArtistGridSkeleton count={6} /> : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+            {artists?.map(a => <ArtistCard key={a.id} artist={a} />)}
+          </div>
+        )}
       </Section>
 
-      {/* New Releases */}
       <Section title="New Releases" icon={Music2}>
-        <AlbumGridSkeleton count={6} />
+        {loadingReleases ? <AlbumGridSkeleton count={6} /> : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2">
+            {newReleases?.map(a => <AlbumCard key={a.id} album={a} />)}
+          </div>
+        )}
       </Section>
     </div>
   );

@@ -12,6 +12,7 @@ interface PlayerContextType extends PlayerState {
   toggleShuffle: () => void;
   toggleRepeat: () => void;
   addToQueue: (track: Track) => void;
+  onTrackPlay: (cb: (track: Track) => void) => () => void;
 }
 
 const PlayerContext = createContext<PlayerContextType | null>(null);
@@ -24,6 +25,7 @@ export const usePlayer = () => {
 
 export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const trackPlayListeners = useRef<Set<(track: Track) => void>>(new Set());
   const [state, setState] = useState<PlayerState>({
     currentTrack: null,
     queue: [],
@@ -77,6 +79,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       if (nextTrack && audioRef.current) {
         audioRef.current.src = nextTrack.audio;
         audioRef.current.play();
+        trackPlayListeners.current.forEach(cb => cb(nextTrack));
       }
       return { ...prev, currentTrack: nextTrack || null, queueIndex: nextIndex, isPlaying: !!nextTrack };
     });
@@ -89,6 +92,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       audioRef.current.src = track.audio;
       audioRef.current.play();
     }
+    trackPlayListeners.current.forEach(cb => cb(track));
     setState(s => ({ ...s, currentTrack: track, queue: q, queueIndex: idx >= 0 ? idx : 0, isPlaying: true }));
   }, []);
 
@@ -112,6 +116,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       if (prevTrack && audioRef.current) {
         audioRef.current.src = prevTrack.audio;
         audioRef.current.play();
+        trackPlayListeners.current.forEach(cb => cb(prevTrack));
       }
       return { ...prev, currentTrack: prevTrack || null, queueIndex: prevIndex, isPlaying: !!prevTrack };
     });
@@ -142,6 +147,11 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setState(s => ({ ...s, queue: [...s.queue, track] }));
   }, []);
 
+  const onTrackPlay = useCallback((cb: (track: Track) => void) => {
+    trackPlayListeners.current.add(cb);
+    return () => { trackPlayListeners.current.delete(cb); };
+  }, []);
+
   // Keyboard shortcut
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -155,7 +165,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   }, [state.isPlaying, pause, resume]);
 
   return (
-    <PlayerContext.Provider value={{ ...state, play, pause, resume, next, previous, seek, setVolume, toggleShuffle, toggleRepeat, addToQueue }}>
+    <PlayerContext.Provider value={{ ...state, play, pause, resume, next, previous, seek, setVolume, toggleShuffle, toggleRepeat, addToQueue, onTrackPlay }}>
       {children}
     </PlayerContext.Provider>
   );

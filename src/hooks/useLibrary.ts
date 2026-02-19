@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { Track } from '@/types/music';
@@ -119,7 +120,7 @@ export function useRecentlyPlayed() {
 export function useAddRecentlyPlayed() {
   const { user } = useAuth();
 
-  return async (track: Track) => {
+  return useCallback(async (track: Track) => {
     if (!user) return;
     await supabase.from('recently_played').insert({
       user_id: user.id,
@@ -133,5 +134,5 @@ export function useAddRecentlyPlayed() {
       duration: track.duration,
       audio: track.audio,
     });
-  };
+  }, [user]);
 }

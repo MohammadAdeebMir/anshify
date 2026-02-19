@@ -2,6 +2,7 @@ import { Outlet } from 'react-router-dom';
 import { AppSidebar } from './AppSidebar';
 import { MobileNav } from './MobileNav';
 import { PlayerBar } from './PlayerBar';
+import { RecentlyPlayedTracker } from '@/components/RecentlyPlayedTracker';
 import { usePlayer } from '@/contexts/PlayerContext';
 import { cn } from '@/lib/utils';
 
@@ -15,6 +16,7 @@ export const AppLayout = () => {
       <div className="absolute inset-0 gradient-radial pointer-events-none" />
 
       <AppSidebar />
+      <RecentlyPlayedTracker />
 
       <main className={cn(
         'flex-1 overflow-y-auto relative z-10',

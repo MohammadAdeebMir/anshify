@@ -59,6 +59,48 @@ export type Database = {
         }
         Relationships: []
       }
+      listening_stats: {
+        Row: {
+          album_name: string
+          artist_id: string
+          artist_name: string
+          created_at: string
+          genre_tags: string[] | null
+          id: string
+          last_played_at: string
+          play_count: number
+          track_id: string
+          track_name: string
+          user_id: string
+        }
+        Insert: {
+          album_name?: string
+          artist_id: string
+          artist_name: string
+          created_at?: string
+          genre_tags?: string[] | null
+          id?: string
+          last_played_at?: string
+          play_count?: number
+          track_id: string
+          track_name: string
+          user_id: string
+        }
+        Update: {
+          album_name?: string
+          artist_id?: string
+          artist_name?: string
+          created_at?: string
+          genre_tags?: string[] | null
+          id?: string
+          last_played_at?: string
+          play_count?: number
+          track_id?: string
+          track_name?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       playlist_songs: {
         Row: {
           added_at: string
@@ -120,25 +162,31 @@ export type Database = {
       }
       playlists: {
         Row: {
+          cover_image: string | null
           created_at: string
           description: string | null
           id: string
+          is_public: boolean
           name: string
           updated_at: string
           user_id: string
         }
         Insert: {
+          cover_image?: string | null
           created_at?: string
           description?: string | null
           id?: string
+          is_public?: boolean
           name: string
           updated_at?: string
           user_id: string
         }
         Update: {
+          cover_image?: string | null
           created_at?: string
           description?: string | null
           id?: string
+          is_public?: boolean
           name?: string
           updated_at?: string
           user_id?: string
@@ -151,6 +199,9 @@ export type Database = {
           created_at: string
           display_name: string | null
           id: string
+          last_listen_date: string | null
+          streak_days: number
+          total_listens: number
           updated_at: string
           user_id: string
         }
@@ -159,6 +210,9 @@ export type Database = {
           created_at?: string
           display_name?: string | null
           id?: string
+          last_listen_date?: string | null
+          streak_days?: number
+          total_listens?: number
           updated_at?: string
           user_id: string
         }
@@ -167,6 +221,9 @@ export type Database = {
           created_at?: string
           display_name?: string | null
           id?: string
+          last_listen_date?: string | null
+          streak_days?: number
+          total_listens?: number
           updated_at?: string
           user_id?: string
         }
@@ -214,6 +271,27 @@ export type Database = {
           track_id?: string
           track_name?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      user_follows: {
+        Row: {
+          created_at: string
+          follower_id: string
+          following_id: string
+          id: string
+        }
+        Insert: {
+          created_at?: string
+          follower_id: string
+          following_id: string
+          id?: string
+        }
+        Update: {
+          created_at?: string
+          follower_id?: string
+          following_id?: string
+          id?: string
         }
         Relationships: []
       }

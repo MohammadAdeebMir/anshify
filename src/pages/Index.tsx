@@ -7,6 +7,7 @@ import { getTrendingTracks, getNewReleases, getPopularArtists } from '@/services
 import { usePlayer } from '@/contexts/PlayerContext';
 import { useAuth } from '@/hooks/useAuth';
 import { useLikedSongs, useLikeTrack } from '@/hooks/useLibrary';
+import { AddToPlaylistButton } from '@/components/AddToPlaylistButton';
 import { Track } from '@/types/music';
 
 const fadeIn = {
@@ -56,12 +57,15 @@ const TrackRow = ({ track, index, tracks }: { track: Track; index: number; track
         </div>
       </button>
       {user && (
-        <button
-          onClick={() => toggleLike.mutate({ track, liked })}
-          className={`p-1.5 rounded-full transition-colors ${liked ? 'text-primary' : 'text-muted-foreground hover:text-foreground'}`}
-        >
-          <Heart className={`h-4 w-4 ${liked ? 'fill-current' : ''}`} />
-        </button>
+        <>
+          <button
+            onClick={() => toggleLike.mutate({ track, liked })}
+            className={`p-1.5 rounded-full transition-colors ${liked ? 'text-primary' : 'text-muted-foreground hover:text-foreground'}`}
+          >
+            <Heart className={`h-4 w-4 ${liked ? 'fill-current' : ''}`} />
+          </button>
+          <AddToPlaylistButton track={track} />
+        </>
       )}
       <span className="text-xs text-muted-foreground tabular-nums">
         {Math.floor(track.duration / 60)}:{String(track.duration % 60).padStart(2, '0')}

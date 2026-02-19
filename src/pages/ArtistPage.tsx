@@ -1,33 +1,53 @@
 import { useQuery } from '@tanstack/react-query';
 import { useParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { ArrowLeft, Play, Clock } from 'lucide-react';
+import { ArrowLeft, Play, Clock, Heart } from 'lucide-react';
 import { getArtistDetails, getArtistTracks, getArtistAlbums } from '@/services/jamendo';
 import { usePlayer } from '@/contexts/PlayerContext';
+import { useAuth } from '@/hooks/useAuth';
+import { useLikedSongs, useLikeTrack } from '@/hooks/useLibrary';
+import { AddToPlaylistButton } from '@/components/AddToPlaylistButton';
 import { SongListSkeleton, AlbumGridSkeleton } from '@/components/skeletons/Skeletons';
 import { Track } from '@/types/music';
 
 const TrackRow = ({ track, index, tracks }: { track: Track; index: number; tracks: Track[] }) => {
   const { play, currentTrack, isPlaying } = usePlayer();
+  const { user } = useAuth();
+  const { likedSongs } = useLikedSongs();
+  const { isLiked, toggleLike } = useLikeTrack();
   const isActive = currentTrack?.id === track.id;
+  const liked = isLiked(track.id, likedSongs);
 
   return (
-    <button
-      onClick={() => play(track, tracks)}
-      className={`flex items-center gap-3 p-3 w-full text-left rounded-lg transition-colors hover:bg-muted/40 ${isActive ? 'bg-primary/10' : ''}`}
-    >
-      <span className="w-6 text-xs text-muted-foreground text-right tabular-nums">{index + 1}</span>
-      <div className="relative h-10 w-10 rounded-md overflow-hidden flex-shrink-0">
-        <img src={track.album_image} alt={track.album_name} className="h-full w-full object-cover" />
-      </div>
-      <div className="flex-1 min-w-0">
-        <p className={`text-sm font-medium truncate ${isActive ? 'text-primary' : 'text-foreground'}`}>{track.name}</p>
-        <p className="text-xs text-muted-foreground truncate">{track.album_name}</p>
-      </div>
+    <div className={`flex items-center gap-3 p-3 rounded-lg transition-colors hover:bg-muted/40 ${isActive ? 'bg-primary/10' : ''}`}>
+      <button
+        onClick={() => play(track, tracks)}
+        className="flex items-center gap-3 flex-1 min-w-0 text-left"
+      >
+        <span className="w-6 text-xs text-muted-foreground text-right tabular-nums">{index + 1}</span>
+        <div className="relative h-10 w-10 rounded-md overflow-hidden flex-shrink-0">
+          <img src={track.album_image} alt={track.album_name} className="h-full w-full object-cover" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className={`text-sm font-medium truncate ${isActive ? 'text-primary' : 'text-foreground'}`}>{track.name}</p>
+          <p className="text-xs text-muted-foreground truncate">{track.album_name}</p>
+        </div>
+      </button>
+      {user && (
+        <>
+          <button
+            onClick={() => toggleLike.mutate({ track, liked })}
+            className={`p-1.5 rounded-full transition-colors ${liked ? 'text-primary' : 'text-muted-foreground hover:text-foreground'}`}
+          >
+            <Heart className={`h-4 w-4 ${liked ? 'fill-current' : ''}`} />
+          </button>
+          <AddToPlaylistButton track={track} />
+        </>
+      )}
       <span className="text-xs text-muted-foreground tabular-nums">
         {Math.floor(track.duration / 60)}:{String(track.duration % 60).padStart(2, '0')}
       </span>
-    </button>
+    </div>
   );
 };
 

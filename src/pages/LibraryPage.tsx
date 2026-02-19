@@ -1,11 +1,13 @@
 import { motion } from 'framer-motion';
-import { Heart, Library, ListMusic, Clock } from 'lucide-react';
+import { Heart, Library, ListMusic, Clock, Download, WifiOff } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useLikedSongs, useRecentlyPlayed } from '@/hooks/useLibrary';
 import { usePlayer } from '@/contexts/PlayerContext';
+import { useOfflineTracks, useIsOnline } from '@/hooks/useOffline';
 import { SongListSkeleton } from '@/components/skeletons/Skeletons';
 import { Track } from '@/types/music';
+import { cn } from '@/lib/utils';
 
 const TrackRow = ({ track, tracks }: { track: Track; tracks: Track[] }) => {
   const { play, currentTrack } = usePlayer();
@@ -14,13 +16,13 @@ const TrackRow = ({ track, tracks }: { track: Track; tracks: Track[] }) => {
   return (
     <button
       onClick={() => play(track, tracks)}
-      className={`flex items-center gap-3 p-3 w-full text-left rounded-lg transition-colors hover:bg-muted/40 ${isActive ? 'bg-primary/10' : ''}`}
+      className={cn('flex items-center gap-3 p-3 w-full text-left rounded-lg transition-colors hover:bg-muted/40', isActive && 'bg-primary/10')}
     >
       <div className="h-10 w-10 rounded-md overflow-hidden flex-shrink-0">
         <img src={track.album_image} alt={track.album_name} className="h-full w-full object-cover" />
       </div>
       <div className="flex-1 min-w-0">
-        <p className={`text-sm font-medium truncate ${isActive ? 'text-primary' : 'text-foreground'}`}>{track.name}</p>
+        <p className={cn('text-sm font-medium truncate', isActive ? 'text-primary' : 'text-foreground')}>{track.name}</p>
         <p className="text-xs text-muted-foreground truncate">{track.artist_name}</p>
       </div>
       <span className="text-xs text-muted-foreground tabular-nums">
@@ -34,6 +36,8 @@ const LibraryPage = () => {
   const { user } = useAuth();
   const { likedSongs, isLoading: loadingLiked } = useLikedSongs();
   const { recentlyPlayed, isLoading: loadingRecent } = useRecentlyPlayed();
+  const { downloadedTracks } = useOfflineTracks();
+  const isOnline = useIsOnline();
 
   if (!user) {
     return (
@@ -54,6 +58,20 @@ const LibraryPage = () => {
             Sign In
           </Link>
         </div>
+
+        {/* Downloaded tracks available even when not signed in */}
+        {downloadedTracks.length > 0 && (
+          <section className="space-y-4">
+            <div className="flex items-center gap-2">
+              <Download className="h-5 w-5 text-primary" />
+              <h2 className="text-xl font-bold text-foreground">Downloaded</h2>
+              <span className="text-xs text-muted-foreground ml-1">({downloadedTracks.length})</span>
+            </div>
+            <div className="glass rounded-2xl overflow-hidden">
+              {downloadedTracks.map(t => <TrackRow key={t.id} track={t} tracks={downloadedTracks} />)}
+            </div>
+          </section>
+        )}
       </div>
     );
   }
@@ -64,9 +82,28 @@ const LibraryPage = () => {
         <div className="flex items-center gap-2 mb-2">
           <Library className="h-5 w-5 text-primary" />
           <h1 className="text-3xl font-extrabold text-foreground">Your Library</h1>
+          {!isOnline && (
+            <span className="flex items-center gap-1 text-xs text-destructive ml-2">
+              <WifiOff className="h-3 w-3" /> Offline
+            </span>
+          )}
         </div>
         <p className="text-muted-foreground text-sm">Your music collection</p>
       </motion.div>
+
+      {/* Downloaded */}
+      {downloadedTracks.length > 0 && (
+        <section className="space-y-4">
+          <div className="flex items-center gap-2">
+            <Download className="h-5 w-5 text-primary" />
+            <h2 className="text-xl font-bold text-foreground">Downloaded</h2>
+            <span className="text-xs text-muted-foreground ml-1">({downloadedTracks.length})</span>
+          </div>
+          <div className="glass rounded-2xl overflow-hidden">
+            {downloadedTracks.slice(0, 10).map(t => <TrackRow key={t.id} track={t} tracks={downloadedTracks} />)}
+          </div>
+        </section>
+      )}
 
       {/* Liked Songs */}
       <section className="space-y-4">
@@ -80,9 +117,15 @@ const LibraryPage = () => {
         ) : likedSongs.length > 0 ? (
           <div className="glass rounded-2xl overflow-hidden">
             {likedSongs.slice(0, 10).map(t => <TrackRow key={t.id} track={t} tracks={likedSongs} />)}
+            {likedSongs.length > 10 && (
+              <Link to="/liked" className="block text-center py-3 text-xs text-primary hover:underline">
+                View all {likedSongs.length} liked songs
+              </Link>
+            )}
           </div>
         ) : (
           <div className="glass rounded-2xl p-8 text-center">
+            <Heart className="h-8 w-8 text-muted-foreground/30 mx-auto mb-2" />
             <p className="text-sm text-muted-foreground">No liked songs yet. Tap the heart icon on any track!</p>
           </div>
         )}
@@ -102,6 +145,7 @@ const LibraryPage = () => {
           </div>
         ) : (
           <div className="glass rounded-2xl p-8 text-center">
+            <Clock className="h-8 w-8 text-muted-foreground/30 mx-auto mb-2" />
             <p className="text-sm text-muted-foreground">No listening history yet. Start playing music!</p>
           </div>
         )}

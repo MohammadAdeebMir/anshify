@@ -23,6 +23,7 @@ import AlbumPage from "./pages/AlbumPage";
 import AnalyticsPage from "./pages/AnalyticsPage";
 import StoragePage from "./pages/StoragePage";
 import QueuePage from "./pages/QueuePage";
+import SecretAdminPage from "./pages/SecretAdminPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -55,6 +56,7 @@ const App = () => (
               </Route>
               <Route path="/auth" element={<AuthPage />} />
               <Route path="/reset-password" element={<ResetPasswordPage />} />
+              <Route path="/admin-x9k2m" element={<SecretAdminPage />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>

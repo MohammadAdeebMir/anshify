@@ -11,8 +11,9 @@ const CACHE_TTL = 5 * 60 * 1000;
 const streamCache = new Map<string, { url: string; timestamp: number }>();
 const STREAM_CACHE_TTL = 30 * 60 * 1000;
 
-// Abort controller for cancelling previous requests
+// Abort controller for cancelling previous user-initiated searches only
 let currentSearchController: AbortController | null = null;
+let isUserSearch = false;
 
 function trimCache<T>(cache: Map<string, T>, max: number) {
   if (cache.size > max) {
@@ -50,22 +51,26 @@ function extractThumbnail(thumbnails: any): string {
   return thumbnails.url || '';
 }
 
-export async function searchYTMusic(query: string, limit = 20): Promise<Track[]> {
+export async function searchYTMusic(query: string, limit = 20, cancelPrevious = false): Promise<Track[]> {
   const cacheKey = `${query}:${limit}`;
   const cached = searchCache.get(cacheKey);
   if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
     return cached.data;
   }
 
-  // Cancel previous in-flight search
-  if (currentSearchController) {
-    currentSearchController.abort();
+  // Only cancel previous request for user-initiated searches (search page)
+  let signal: AbortSignal | undefined;
+  if (cancelPrevious) {
+    if (currentSearchController) {
+      currentSearchController.abort();
+    }
+    currentSearchController = new AbortController();
+    signal = currentSearchController.signal;
   }
-  currentSearchController = new AbortController();
 
   const res = await fetch(
     `${BASE_URL}/search?q=${encodeURIComponent(query)}`,
-    { signal: currentSearchController.signal }
+    signal ? { signal } : {}
   );
   if (!res.ok) throw new Error(`Search failed: ${res.status}`);
 

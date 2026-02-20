@@ -101,7 +101,7 @@ const SearchPage = () => {
 
   const { data: ytResults, isLoading: ytLoading, error: ytError, refetch: retrySearch } = useQuery({
     queryKey: ['yt-search', debouncedQuery],
-    queryFn: () => searchYTMusic(debouncedQuery, 20),
+    queryFn: () => searchYTMusic(debouncedQuery, 20, true),
     enabled: debouncedQuery.length >= 2 && isOnline,
     staleTime: 2 * 60 * 1000,
     retry: 1,

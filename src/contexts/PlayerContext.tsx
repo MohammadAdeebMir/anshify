@@ -230,6 +230,10 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   }, []);
 
   const resolveAndPlay = useCallback(async (track: Track, audio: HTMLAudioElement) => {
+    // Unlock audio element synchronously (for mobile gesture context)
+    try { await audio.play().catch(() => {}); } catch {}
+    audio.pause();
+
     try {
       let src = track.audio;
       if (needsStreamResolution(track)) {

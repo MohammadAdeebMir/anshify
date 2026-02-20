@@ -1,10 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, ArrowUpDown, Filter, X, Music2 } from 'lucide-react';
+import { Search, ArrowUpDown, Filter, X, Music2, WifiOff } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { useQuery } from '@tanstack/react-query';
-import { searchYTMusic } from '@/services/ytmusic';
-import { getTracksByGenre } from '@/services/jamendo';
+import { searchYTMusic, getTracksByGenreYT } from '@/services/ytmusic';
 import { usePlayer } from '@/contexts/PlayerContext';
 import { useOfflineTracks } from '@/hooks/useOffline';
 import { Track } from '@/types/music';
@@ -15,6 +14,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useLikedSongs, useLikeTrack } from '@/hooks/useLibrary';
 import { AddToPlaylistButton } from '@/components/AddToPlaylistButton';
 import { Heart, Download, Play, Pause } from 'lucide-react';
+import { useIsOnline } from '@/hooks/useOffline';
 
 const genres = [
   { name: 'Pop', color: 'from-pink-500 to-rose-600' },
@@ -47,7 +47,11 @@ const GenreTrackRow = ({ track, tracks }: { track: Track; tracks: Track[] }) => 
     <div className={cn('flex items-center gap-3 p-3 rounded-2xl transition-all hover:bg-muted/50', isActive && 'bg-primary/10 ring-1 ring-primary/20')}>
       <button onClick={() => play(track, tracks)} className="flex items-center gap-3 flex-1 min-w-0 text-left group">
         <div className="relative h-12 w-12 rounded-xl overflow-hidden flex-shrink-0 shadow-lg">
-          <img src={track.album_image} alt={track.album_name} className="h-full w-full object-cover" />
+          {track.album_image ? (
+            <img src={track.album_image} alt={track.album_name} className="h-full w-full object-cover" loading="lazy" />
+          ) : (
+            <div className="h-full w-full bg-muted flex items-center justify-center"><Play className="h-4 w-4 text-muted-foreground" /></div>
+          )}
           <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center">
             <div className="opacity-0 group-hover:opacity-100 transition-opacity">
               {isActive && isPlaying ? <Pause className="h-5 w-5 text-white" /> : <Play className="h-5 w-5 text-white ml-0.5" />}
@@ -72,9 +76,11 @@ const GenreTrackRow = ({ track, tracks }: { track: Track; tracks: Track[] }) => 
           )}
         </>
       )}
-      <span className="text-xs text-muted-foreground tabular-nums">
-        {Math.floor(track.duration / 60)}:{String(track.duration % 60).padStart(2, '0')}
-      </span>
+      {track.duration > 0 && (
+        <span className="text-xs text-muted-foreground tabular-nums">
+          {Math.floor(track.duration / 60)}:{String(track.duration % 60).padStart(2, '0')}
+        </span>
+      )}
     </div>
   );
 };
@@ -86,26 +92,25 @@ const SearchPage = () => {
   const [sortMode, setSortMode] = useState<SortMode>('relevance');
   const [showDownloaded, setShowDownloaded] = useState(false);
   const { downloadedTracks } = useOfflineTracks();
+  const isOnline = useIsOnline();
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedQuery(query), 300);
     return () => clearTimeout(timer);
   }, [query]);
 
-  // YT Music search (primary)
   const { data: ytResults, isLoading: ytLoading, error: ytError, refetch: retrySearch } = useQuery({
     queryKey: ['yt-search', debouncedQuery],
     queryFn: () => searchYTMusic(debouncedQuery, 20),
-    enabled: debouncedQuery.length >= 2,
+    enabled: debouncedQuery.length >= 2 && isOnline,
     staleTime: 2 * 60 * 1000,
     retry: 1,
   });
 
-  // Genre browsing (Jamendo)
   const { data: genreTracks, isLoading: loadingGenre } = useQuery({
-    queryKey: ['genre-tracks', selectedGenre],
-    queryFn: () => getTracksByGenre(selectedGenre!, 20),
-    enabled: !!selectedGenre,
+    queryKey: ['genre-yt', selectedGenre],
+    queryFn: () => getTracksByGenreYT(selectedGenre!, 20),
+    enabled: !!selectedGenre && isOnline,
     staleTime: 5 * 60 * 1000,
   });
 
@@ -128,7 +133,14 @@ const SearchPage = () => {
 
   return (
     <div className="p-6 md:p-8 space-y-8 max-w-7xl mx-auto">
-      {/* Header */}
+      {/* Offline indicator */}
+      {!isOnline && (
+        <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="flex items-center gap-2 px-4 py-3 rounded-2xl bg-destructive/10 border border-destructive/20">
+          <WifiOff className="h-4 w-4 text-destructive" />
+          <p className="text-sm text-destructive">You're offline. Showing downloaded content only.</p>
+        </motion.div>
+      )}
+
       <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
         <div className="flex items-center gap-3">
           <Music2 className="h-7 w-7 text-primary" />
@@ -175,7 +187,6 @@ const SearchPage = () => {
         )}
       </motion.div>
 
-      {/* YT Music Search Results */}
       {showResults && (
         <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
           <h2 className="text-lg font-bold mb-3 text-foreground">Results</h2>
@@ -189,7 +200,6 @@ const SearchPage = () => {
         </motion.div>
       )}
 
-      {/* Genre Results (Jamendo) */}
       {showGenreResults && (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
           <div className="flex items-center gap-3 mb-4">
@@ -210,7 +220,6 @@ const SearchPage = () => {
         </motion.div>
       )}
 
-      {/* Downloaded tracks section */}
       {showDownloaded && downloadedTracks.length > 0 && !showResults && !showGenreResults && (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
           <h2 className="text-xl font-bold mb-4 text-foreground">Downloaded ({downloadedTracks.length})</h2>
@@ -220,7 +229,6 @@ const SearchPage = () => {
         </motion.div>
       )}
 
-      {/* Genre Browse */}
       {!showResults && (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.1 }}>
           <h2 className="text-xl font-bold mb-4 text-foreground">Browse All</h2>

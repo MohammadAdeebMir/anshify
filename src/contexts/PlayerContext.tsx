@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useRef, useCallback, useEffect } from 'react';
 import { Track, RepeatMode, PlayerState } from '@/types/music';
-import { getStreamUrl, needsStreamResolution } from '@/services/ytmusic';
+import { getStreamUrl, needsStreamResolution, preBufferTrack } from '@/services/ytmusic';
 
 export type CrossfadeMode = 0 | 3 | 5 | 8 | 12;
 
@@ -291,6 +291,11 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     });
     if (audioRef.current) {
       resolveAndPlay(track, audioRef.current);
+    }
+    // Pre-buffer next track
+    const nextIdx = idx + 1;
+    if (nextIdx < q.length && needsStreamResolution(q[nextIdx])) {
+      preBufferTrack(q[nextIdx].id);
     }
   }, [resolveAndPlay]);
 

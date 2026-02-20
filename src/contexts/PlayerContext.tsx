@@ -3,6 +3,12 @@ import { Track, RepeatMode, PlayerState } from '@/types/music';
 
 export type CrossfadeMode = 0 | 3 | 5 | 8 | 12;
 
+interface QueueHistoryEntry {
+  queue: Track[];
+  queueIndex: number;
+  timestamp: number;
+}
+
 interface PlayerContextType extends PlayerState {
   play: (track: Track, queue?: Track[]) => void;
   pause: () => void;
@@ -14,15 +20,28 @@ interface PlayerContextType extends PlayerState {
   toggleShuffle: () => void;
   toggleRepeat: () => void;
   addToQueue: (track: Track) => void;
+  playNext: (track: Track) => void;
+  removeFromQueue: (index: number) => void;
+  reorderQueue: (from: number, to: number) => void;
+  clearQueue: () => void;
+  queueHistory: QueueHistoryEntry[];
   onTrackPlay: (cb: (track: Track) => void) => () => void;
-  // New features
   crossfadeDuration: CrossfadeMode;
   setCrossfadeDuration: (d: CrossfadeMode) => void;
-  sleepTimer: number | null; // minutes remaining, null = off
+  sleepTimer: number | null;
   setSleepTimer: (minutes: number | null) => void;
-  sleepTimerEnd: number | null; // timestamp
+  sleepTimerEnd: number | null;
   volumeNormalization: boolean;
   setVolumeNormalization: (v: boolean) => void;
+  // Visualizer
+  analyserNode: AnalyserNode | null;
+  visualizerEnabled: boolean;
+  setVisualizerEnabled: (v: boolean) => void;
+  // Workout
+  workoutMode: boolean;
+  setWorkoutMode: (v: boolean) => void;
+  targetBPM: number;
+  setTargetBPM: (bpm: number) => void;
 }
 
 const PlayerContext = createContext<PlayerContextType | null>(null);
@@ -33,11 +52,37 @@ export const usePlayer = () => {
   return ctx;
 };
 
+// Persist queue to localStorage
+const QUEUE_KEY = 'ph-queue';
+const QUEUE_INDEX_KEY = 'ph-queue-index';
+const QUEUE_TRACK_KEY = 'ph-queue-track';
+
+function saveQueue(queue: Track[], index: number, track: Track | null) {
+  try {
+    localStorage.setItem(QUEUE_KEY, JSON.stringify(queue.slice(0, 200)));
+    localStorage.setItem(QUEUE_INDEX_KEY, String(index));
+    if (track) localStorage.setItem(QUEUE_TRACK_KEY, JSON.stringify(track));
+  } catch { /* quota exceeded */ }
+}
+
+function loadQueue(): { queue: Track[]; queueIndex: number; currentTrack: Track | null } {
+  try {
+    const q = JSON.parse(localStorage.getItem(QUEUE_KEY) || '[]');
+    const idx = parseInt(localStorage.getItem(QUEUE_INDEX_KEY) || '-1');
+    const t = JSON.parse(localStorage.getItem(QUEUE_TRACK_KEY) || 'null');
+    return { queue: q, queueIndex: idx, currentTrack: t };
+  } catch {
+    return { queue: [], queueIndex: -1, currentTrack: null };
+  }
+}
+
 export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const crossfadeAudioRef = useRef<HTMLAudioElement | null>(null);
-  const crossfadeTimerRef = useRef<number | null>(null);
   const trackPlayListeners = useRef<Set<(track: Track) => void>>(new Set());
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserRef = useRef<AnalyserNode | null>(null);
+  const sourceRef = useRef<MediaElementAudioSourceNode | null>(null);
 
   const [crossfadeDuration, setCrossfadeDurationState] = useState<CrossfadeMode>(
     () => (parseInt(localStorage.getItem('ph-crossfade') || '0') || 0) as CrossfadeMode
@@ -47,12 +92,17 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   );
   const [sleepTimer, setSleepTimerState] = useState<number | null>(null);
   const [sleepTimerEnd, setSleepTimerEnd] = useState<number | null>(null);
-  const sleepTimerRef = useRef<number | null>(null);
+  const [queueHistory, setQueueHistory] = useState<QueueHistoryEntry[]>([]);
+  const [visualizerEnabled, setVisualizerEnabledState] = useState(false);
+  const [workoutMode, setWorkoutModeState] = useState(false);
+  const [targetBPM, setTargetBPMState] = useState(120);
+
+  const savedQueue = loadQueue();
 
   const [state, setState] = useState<PlayerState>({
-    currentTrack: null,
-    queue: [],
-    queueIndex: -1,
+    currentTrack: savedQueue.currentTrack,
+    queue: savedQueue.queue,
+    queueIndex: savedQueue.queueIndex,
     isPlaying: false,
     volume: parseFloat(localStorage.getItem('ph-volume') || '0.7'),
     progress: 0,
@@ -61,21 +111,18 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     repeat: (localStorage.getItem('ph-repeat') as RepeatMode) || 'off',
   });
 
-  // Smart shuffle: track recently played artist IDs to avoid repeats
   const recentArtistsRef = useRef<string[]>([]);
 
+  // Setup audio + analyser
   useEffect(() => {
-    audioRef.current = new Audio();
-    audioRef.current.volume = state.volume;
+    const audio = new Audio();
+    audio.volume = state.volume;
+    audio.crossOrigin = 'anonymous';
+    audioRef.current = audio;
     crossfadeAudioRef.current = new Audio();
     crossfadeAudioRef.current.volume = 0;
 
-    const audio = audioRef.current;
-    const onTimeUpdate = () => {
-      setState(s => ({ ...s, progress: audio.currentTime }));
-      // Handle crossfade near end
-      handleCrossfadeCheck(audio);
-    };
+    const onTimeUpdate = () => setState(s => ({ ...s, progress: audio.currentTime }));
     const onLoadedMeta = () => setState(s => ({ ...s, duration: audio.duration }));
     const onEnded = () => handleTrackEnd();
 
@@ -93,7 +140,31 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Media Session API for lock screen / notification controls
+  // Setup analyser on demand
+  useEffect(() => {
+    if (!visualizerEnabled || !audioRef.current) {
+      analyserRef.current = null;
+      return;
+    }
+    try {
+      if (!audioContextRef.current) {
+        audioContextRef.current = new AudioContext();
+      }
+      const ctx = audioContextRef.current;
+      if (!sourceRef.current) {
+        sourceRef.current = ctx.createMediaElementSource(audioRef.current);
+      }
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 256;
+      sourceRef.current.connect(analyser);
+      analyser.connect(ctx.destination);
+      analyserRef.current = analyser;
+    } catch {
+      analyserRef.current = null;
+    }
+  }, [visualizerEnabled]);
+
+  // Media Session API
   useEffect(() => {
     if (!('mediaSession' in navigator)) return;
     const ms = navigator.mediaSession;
@@ -115,9 +186,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     ms.setActionHandler('pause', () => pause());
     ms.setActionHandler('previoustrack', () => previous());
     ms.setActionHandler('nexttrack', () => next());
-    ms.setActionHandler('seekto', (details) => {
-      if (details.seekTime != null) seek(details.seekTime);
-    });
+    ms.setActionHandler('seekto', (details) => { if (details.seekTime != null) seek(details.seekTime); });
     return () => {
       ms.setActionHandler('play', null);
       ms.setActionHandler('pause', null);
@@ -128,30 +197,23 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Sleep timer countdown
+  // Sleep timer
   useEffect(() => {
-    if (sleepTimerEnd === null) {
-      setSleepTimerState(null);
-      return;
-    }
+    if (sleepTimerEnd === null) { setSleepTimerState(null); return; }
     const interval = window.setInterval(() => {
       const remaining = Math.max(0, Math.ceil((sleepTimerEnd - Date.now()) / 60000));
       setSleepTimerState(remaining);
-      if (remaining <= 0) {
-        pause();
-        setSleepTimerEnd(null);
-        setSleepTimerState(null);
-      }
+      if (remaining <= 0) { pause(); setSleepTimerEnd(null); setSleepTimerState(null); }
     }, 10000);
-    // Initial set
     setSleepTimerState(Math.max(0, Math.ceil((sleepTimerEnd - Date.now()) / 60000)));
     return () => clearInterval(interval);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sleepTimerEnd]);
 
-  const handleCrossfadeCheck = useCallback((audio: HTMLAudioElement) => {
-    // crossfade logic handled via duration check
-  }, []);
+  // Save queue on change
+  useEffect(() => {
+    saveQueue(state.queue, state.queueIndex, state.currentTrack);
+  }, [state.queue, state.queueIndex, state.currentTrack]);
 
   const getSmartShuffleIndex = useCallback((queue: Track[], currentIndex: number): number => {
     if (queue.length <= 1) return 0;
@@ -159,14 +221,11 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       .map((t, i) => ({ track: t, index: i }))
       .filter(({ index }) => index !== currentIndex)
       .filter(({ track }) => !recentArtistsRef.current.includes(track.artist_id));
-    
     if (candidates.length === 0) {
-      // All artists recently played, just pick random non-current
       const fallback = queue.map((_, i) => i).filter(i => i !== currentIndex);
       return fallback[Math.floor(Math.random() * fallback.length)];
     }
-    const pick = candidates[Math.floor(Math.random() * candidates.length)];
-    return pick.index;
+    return candidates[Math.floor(Math.random() * candidates.length)].index;
   }, []);
 
   const handleTrackEnd = useCallback(() => {
@@ -188,7 +247,6 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }
       const nextTrack = prev.queue[nextIndex];
       if (nextTrack && audioRef.current) {
-        // Track recent artists for smart shuffle
         recentArtistsRef.current = [...recentArtistsRef.current.slice(-4), nextTrack.artist_id];
         audioRef.current.src = nextTrack.audio;
         audioRef.current.play();
@@ -204,22 +262,25 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     if (audioRef.current) {
       audioRef.current.src = track.audio;
       audioRef.current.play();
+      if (audioContextRef.current?.state === 'suspended') audioContextRef.current.resume();
     }
     recentArtistsRef.current = [...recentArtistsRef.current.slice(-4), track.artist_id];
     trackPlayListeners.current.forEach(cb => cb(track));
-    setState(s => ({ ...s, currentTrack: track, queue: q, queueIndex: idx >= 0 ? idx : 0, isPlaying: true }));
+    setState(s => {
+      // Save current queue to history
+      if (s.queue.length > 0) {
+        setQueueHistory(h => [...h.slice(-9), { queue: s.queue, queueIndex: s.queueIndex, timestamp: Date.now() }]);
+      }
+      return { ...s, currentTrack: track, queue: q, queueIndex: idx >= 0 ? idx : 0, isPlaying: true };
+    });
   }, []);
 
-  const pause = useCallback(() => {
-    audioRef.current?.pause();
-    setState(s => ({ ...s, isPlaying: false }));
-  }, []);
-
+  const pause = useCallback(() => { audioRef.current?.pause(); setState(s => ({ ...s, isPlaying: false })); }, []);
   const resume = useCallback(() => {
     audioRef.current?.play();
+    if (audioContextRef.current?.state === 'suspended') audioContextRef.current.resume();
     setState(s => ({ ...s, isPlaying: true }));
   }, []);
-
   const next = useCallback(() => handleTrackEnd(), [handleTrackEnd]);
 
   const previous = useCallback(() => {
@@ -236,70 +297,68 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     });
   }, []);
 
-  const seek = useCallback((time: number) => {
-    if (audioRef.current) audioRef.current.currentTime = time;
-    setState(s => ({ ...s, progress: time }));
-  }, []);
-
-  const setVolume = useCallback((vol: number) => {
-    if (audioRef.current) audioRef.current.volume = vol;
-    localStorage.setItem('ph-volume', String(vol));
-    setState(s => ({ ...s, volume: vol }));
-  }, []);
-
-  const toggleShuffle = useCallback(() => {
-    setState(s => {
-      const next = !s.shuffle;
-      localStorage.setItem('ph-shuffle', String(next));
-      return { ...s, shuffle: next };
-    });
-  }, []);
-
-  const toggleRepeat = useCallback(() => {
-    setState(s => {
-      const modes: RepeatMode[] = ['off', 'all', 'one'];
-      const next = modes[(modes.indexOf(s.repeat) + 1) % 3];
-      localStorage.setItem('ph-repeat', next);
-      return { ...s, repeat: next };
-    });
-  }, []);
+  const seek = useCallback((time: number) => { if (audioRef.current) audioRef.current.currentTime = time; setState(s => ({ ...s, progress: time })); }, []);
+  const setVolume = useCallback((vol: number) => { if (audioRef.current) audioRef.current.volume = vol; localStorage.setItem('ph-volume', String(vol)); setState(s => ({ ...s, volume: vol })); }, []);
+  const toggleShuffle = useCallback(() => { setState(s => { const next = !s.shuffle; localStorage.setItem('ph-shuffle', String(next)); return { ...s, shuffle: next }; }); }, []);
+  const toggleRepeat = useCallback(() => { setState(s => { const modes: RepeatMode[] = ['off', 'all', 'one']; const next = modes[(modes.indexOf(s.repeat) + 1) % 3]; localStorage.setItem('ph-repeat', next); return { ...s, repeat: next }; }); }, []);
 
   const addToQueue = useCallback((track: Track) => {
     setState(s => ({ ...s, queue: [...s.queue, track] }));
   }, []);
 
-  const onTrackPlay = useCallback((cb: (track: Track) => void) => {
-    trackPlayListeners.current.add(cb);
-    return () => { trackPlayListeners.current.delete(cb); };
+  const playNext = useCallback((track: Track) => {
+    setState(s => {
+      const newQueue = [...s.queue];
+      newQueue.splice(s.queueIndex + 1, 0, track);
+      return { ...s, queue: newQueue };
+    });
   }, []);
 
-  const setCrossfadeDuration = useCallback((d: CrossfadeMode) => {
-    localStorage.setItem('ph-crossfade', String(d));
-    setCrossfadeDurationState(d);
+  const removeFromQueue = useCallback((index: number) => {
+    setState(s => {
+      if (index === s.queueIndex) return s; // don't remove current
+      const newQueue = s.queue.filter((_, i) => i !== index);
+      const newIndex = index < s.queueIndex ? s.queueIndex - 1 : s.queueIndex;
+      return { ...s, queue: newQueue, queueIndex: newIndex };
+    });
   }, []);
 
-  const setVolumeNormalization = useCallback((v: boolean) => {
-    localStorage.setItem('ph-normalization', String(v));
-    setVolumeNormalizationState(v);
+  const reorderQueue = useCallback((from: number, to: number) => {
+    setState(s => {
+      const newQueue = [...s.queue];
+      const [moved] = newQueue.splice(from, 1);
+      newQueue.splice(to, 0, moved);
+      let newIndex = s.queueIndex;
+      if (from === s.queueIndex) newIndex = to;
+      else if (from < s.queueIndex && to >= s.queueIndex) newIndex--;
+      else if (from > s.queueIndex && to <= s.queueIndex) newIndex++;
+      return { ...s, queue: newQueue, queueIndex: newIndex };
+    });
   }, []);
 
+  const clearQueue = useCallback(() => {
+    setState(s => {
+      const current = s.currentTrack;
+      return { ...s, queue: current ? [current] : [], queueIndex: current ? 0 : -1 };
+    });
+  }, []);
+
+  const onTrackPlay = useCallback((cb: (track: Track) => void) => { trackPlayListeners.current.add(cb); return () => { trackPlayListeners.current.delete(cb); }; }, []);
+  const setCrossfadeDuration = useCallback((d: CrossfadeMode) => { localStorage.setItem('ph-crossfade', String(d)); setCrossfadeDurationState(d); }, []);
+  const setVolumeNormalization = useCallback((v: boolean) => { localStorage.setItem('ph-normalization', String(v)); setVolumeNormalizationState(v); }, []);
   const setSleepTimer = useCallback((minutes: number | null) => {
-    if (minutes === null) {
-      setSleepTimerEnd(null);
-      setSleepTimerState(null);
-    } else {
-      setSleepTimerEnd(Date.now() + minutes * 60000);
-      setSleepTimerState(minutes);
-    }
+    if (minutes === null) { setSleepTimerEnd(null); setSleepTimerState(null); }
+    else { setSleepTimerEnd(Date.now() + minutes * 60000); setSleepTimerState(minutes); }
   }, []);
 
-  // Keyboard shortcut
+  const setVisualizerEnabled = useCallback((v: boolean) => setVisualizerEnabledState(v), []);
+  const setWorkoutMode = useCallback((v: boolean) => setWorkoutModeState(v), []);
+  const setTargetBPM = useCallback((bpm: number) => setTargetBPMState(bpm), []);
+
+  // Keyboard
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.code === 'Space' && e.target === document.body) {
-        e.preventDefault();
-        state.isPlaying ? pause() : resume();
-      }
+      if (e.code === 'Space' && e.target === document.body) { e.preventDefault(); state.isPlaying ? pause() : resume(); }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
@@ -308,10 +367,13 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   return (
     <PlayerContext.Provider value={{
       ...state, play, pause, resume, next, previous, seek, setVolume,
-      toggleShuffle, toggleRepeat, addToQueue, onTrackPlay,
+      toggleShuffle, toggleRepeat, addToQueue, playNext, removeFromQueue, reorderQueue, clearQueue, queueHistory, onTrackPlay,
       crossfadeDuration, setCrossfadeDuration,
       sleepTimer, setSleepTimer, sleepTimerEnd,
       volumeNormalization, setVolumeNormalization,
+      analyserNode: analyserRef.current,
+      visualizerEnabled, setVisualizerEnabled,
+      workoutMode, setWorkoutMode, targetBPM, setTargetBPM,
     }}>
       {children}
     </PlayerContext.Provider>

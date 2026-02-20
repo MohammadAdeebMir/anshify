@@ -14,7 +14,7 @@ serve(async (req) => {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
-    const { listeningHistory, likedArtists, action } = await req.json();
+    const { listeningHistory, likedArtists, action, prompt, lyrics, targetLang } = await req.json();
 
     let systemPrompt = "";
     let userPrompt = "";
@@ -27,6 +27,12 @@ Liked artists: ${JSON.stringify(likedArtists?.slice(0, 10) || [])}`;
       systemPrompt = `You are a playlist curator AI. Given listening data, create 3 themed mini-playlists. Return ONLY a JSON array of objects with "name" (creative playlist name), "description" (1 sentence), and "search_queries" (array of 3 search terms to find tracks). No markdown, just JSON.`;
       userPrompt = `User's recent listening: ${JSON.stringify(listeningHistory?.slice(0, 20) || [])}
 Favorite artists: ${JSON.stringify(likedArtists?.slice(0, 10) || [])}`;
+    } else if (action === "prompt_playlist") {
+      systemPrompt = `You are a music search query generator. Given a natural language description of a playlist mood/vibe, generate 5 search queries that would find matching songs on a music platform. Return ONLY a JSON array of strings (search queries). No markdown, no explanation, just the JSON array. The queries should be diverse and cover different aspects of the request.`;
+      userPrompt = `Create a playlist for: "${prompt}"`;
+    } else if (action === "translate_lyrics") {
+      systemPrompt = `You are a lyrics translator. Translate the given song lyrics to the target language. Preserve formatting and line breaks. Return ONLY the translated text, no explanation.`;
+      userPrompt = `Translate to ${targetLang}:\n\n${lyrics}`;
     } else if (action === "mood") {
       systemPrompt = `You are a mood-based music curator. Given a mood, suggest 5 genre/tag search queries that match. Return ONLY a JSON array of strings (search queries). No markdown, just JSON.`;
       userPrompt = `Mood: ${action}. Additional context: ${JSON.stringify(listeningHistory?.slice(0, 5) || [])}`;
@@ -68,7 +74,14 @@ Favorite artists: ${JSON.stringify(likedArtists?.slice(0, 10) || [])}`;
     const data = await response.json();
     const content = data.choices?.[0]?.message?.content || "[]";
     
-    // Parse JSON from response, handling potential markdown wrapping
+    // For translate_lyrics, return raw text
+    if (action === "translate_lyrics") {
+      return new Response(JSON.stringify({ result: content }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Parse JSON from response
     let parsed;
     try {
       const jsonStr = content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();

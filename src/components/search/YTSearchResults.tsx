@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Play, Pause, Heart, Download, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
+import { Play, Pause, Heart, Download, AlertCircle, RefreshCw } from 'lucide-react';
 import { Track } from '@/types/music';
 import { usePlayer } from '@/contexts/PlayerContext';
 import { useAuth } from '@/hooks/useAuth';
@@ -9,6 +9,24 @@ import { AddToPlaylistButton } from '@/components/AddToPlaylistButton';
 import { useOfflineTracks } from '@/hooks/useOffline';
 import { cn } from '@/lib/utils';
 import { SongListSkeleton } from '@/components/skeletons/Skeletons';
+
+// Crossfade image loader
+const ImgFade = ({ src, alt }: { src: string; alt: string }) => {
+  const [loaded, setLoaded] = useState(false);
+  return (
+    <>
+      {!loaded && <div className="absolute inset-0 bg-muted animate-pulse" />}
+      <img
+        src={src}
+        alt={alt}
+        onLoad={() => setLoaded(true)}
+        className={`h-full w-full object-cover transition-opacity duration-400 ${loaded ? 'opacity-100' : 'opacity-0'}`}
+        loading="lazy"
+        decoding="async"
+      />
+    </>
+  );
+};
 
 const YTTrackRow = ({ track, tracks, index }: { track: Track; tracks: Track[]; index: number }) => {
   const { play, currentTrack, isPlaying } = usePlayer();
@@ -34,7 +52,7 @@ const YTTrackRow = ({ track, tracks, index }: { track: Track; tracks: Track[]; i
       <button onClick={() => play(track, tracks)} className="flex items-center gap-3 flex-1 min-w-0 text-left group">
         <div className="relative h-12 w-12 rounded-xl overflow-hidden flex-shrink-0 shadow-lg">
           {track.album_image ? (
-            <img src={track.album_image} alt={track.album_name} className="h-full w-full object-cover" loading="lazy" />
+            <ImgFade src={track.album_image} alt={track.album_name} />
           ) : (
             <div className="h-full w-full bg-muted flex items-center justify-center">
               <Play className="h-4 w-4 text-muted-foreground" />

@@ -23,7 +23,7 @@ export const AppLayout = () => {
         <OfflineBanner />
         <main className={cn(
           'flex-1 overflow-y-auto',
-          hasPlayer ? 'pb-24 md:pb-24' : 'pb-16 md:pb-0'
+          hasPlayer ? 'pb-36 md:pb-24' : 'pb-16 md:pb-0'
         )}>
           <Outlet />
         </main>

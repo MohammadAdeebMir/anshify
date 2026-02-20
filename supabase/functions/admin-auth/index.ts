@@ -12,146 +12,100 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { username, password, action } = await req.json();
+    const body = await req.json();
+    const { username, password, action, notificationTitle, notificationBody, notificationImage, notificationId } = body;
 
     const adminUser = Deno.env.get("ADMIN_USERNAME");
     const adminPass = Deno.env.get("ADMIN_PASSWORD");
 
     if (!adminUser || !adminPass) {
       return new Response(JSON.stringify({ error: "Admin not configured" }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     if (username !== adminUser || password !== adminPass) {
       return new Response(JSON.stringify({ error: "Invalid credentials" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Credentials valid — fetch stats using service role
     const supabase = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
+    // ── Send notification ──
+    if (action === "send_notification") {
+      if (!notificationTitle || !notificationBody) {
+        return new Response(JSON.stringify({ error: "Title and body required" }), {
+          status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      const { data, error: insertErr } = await supabase.from("notifications").insert({
+        title: notificationTitle,
+        body: notificationBody,
+        image_url: notificationImage || null,
+      }).select().single();
+      if (insertErr) throw insertErr;
+      return new Response(JSON.stringify({ success: true, notification: data }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // ── List notifications ──
+    if (action === "list_notifications") {
+      const { data } = await supabase.from("notifications")
+        .select("*").order("created_at", { ascending: false }).limit(30);
+      return new Response(JSON.stringify({ notifications: data || [] }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // ── Delete notification ──
+    if (action === "delete_notification" && notificationId) {
+      await supabase.from("notifications").delete().eq("id", notificationId);
+      return new Response(JSON.stringify({ success: true }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // ── Default: return stats (original behavior) ──
     const now = new Date();
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
     const weekStart = new Date(now.getTime() - 7 * 86400000).toISOString();
 
-    // Total users
-    const { count: totalUsers } = await supabase
-      .from("profiles")
-      .select("*", { count: "exact", head: true });
+    const { count: totalUsers } = await supabase.from("profiles").select("*", { count: "exact", head: true });
+    const { count: activeToday } = await supabase.from("recently_played").select("user_id", { count: "exact", head: true }).gte("played_at", todayStart);
+    const { count: activeWeek } = await supabase.from("recently_played").select("user_id", { count: "exact", head: true }).gte("played_at", weekStart);
+    const { count: activeMonth } = await supabase.from("recently_played").select("user_id", { count: "exact", head: true }).gte("played_at", monthStart);
+    const { count: newToday } = await supabase.from("profiles").select("*", { count: "exact", head: true }).gte("created_at", todayStart);
+    const { count: newMonth } = await supabase.from("profiles").select("*", { count: "exact", head: true }).gte("created_at", monthStart);
+    const { count: totalPlays } = await supabase.from("recently_played").select("*", { count: "exact", head: true });
+    const { count: totalLikes } = await supabase.from("liked_songs").select("*", { count: "exact", head: true });
+    const { count: totalPlaylists } = await supabase.from("playlists").select("*", { count: "exact", head: true });
+    const { data: topArtists } = await supabase.from("listening_stats").select("artist_name, play_count").order("play_count", { ascending: false }).limit(10);
+    const { data: topTracks } = await supabase.from("listening_stats").select("track_name, artist_name, play_count").order("play_count", { ascending: false }).limit(10);
+    const { data: recentUsers } = await supabase.from("profiles").select("display_name, avatar_url, created_at, total_listens, streak_days").order("created_at", { ascending: false }).limit(10);
 
-    // Active today (users who played something today)
-    const { count: activeToday } = await supabase
-      .from("recently_played")
-      .select("user_id", { count: "exact", head: true })
-      .gte("played_at", todayStart);
-
-    // Active this week
-    const { count: activeWeek } = await supabase
-      .from("recently_played")
-      .select("user_id", { count: "exact", head: true })
-      .gte("played_at", weekStart);
-
-    // Active this month
-    const { count: activeMonth } = await supabase
-      .from("recently_played")
-      .select("user_id", { count: "exact", head: true })
-      .gte("played_at", monthStart);
-
-    // New users today
-    const { count: newToday } = await supabase
-      .from("profiles")
-      .select("*", { count: "exact", head: true })
-      .gte("created_at", todayStart);
-
-    // New users this month
-    const { count: newMonth } = await supabase
-      .from("profiles")
-      .select("*", { count: "exact", head: true })
-      .gte("created_at", monthStart);
-
-    // Total plays
-    const { count: totalPlays } = await supabase
-      .from("recently_played")
-      .select("*", { count: "exact", head: true });
-
-    // Total liked songs
-    const { count: totalLikes } = await supabase
-      .from("liked_songs")
-      .select("*", { count: "exact", head: true });
-
-    // Total playlists
-    const { count: totalPlaylists } = await supabase
-      .from("playlists")
-      .select("*", { count: "exact", head: true });
-
-    // Top artists (most played)
-    const { data: topArtists } = await supabase
-      .from("listening_stats")
-      .select("artist_name, play_count")
-      .order("play_count", { ascending: false })
-      .limit(10);
-
-    // Top tracks
-    const { data: topTracks } = await supabase
-      .from("listening_stats")
-      .select("track_name, artist_name, play_count")
-      .order("play_count", { ascending: false })
-      .limit(10);
-
-    // Recent signups (last 10)
-    const { data: recentUsers } = await supabase
-      .from("profiles")
-      .select("display_name, avatar_url, created_at, total_listens, streak_days")
-      .order("created_at", { ascending: false })
-      .limit(10);
-
-    // Daily play counts for the last 30 days
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 86400000).toISOString();
-    const { data: recentPlays } = await supabase
-      .from("recently_played")
-      .select("played_at")
-      .gte("played_at", thirtyDaysAgo)
-      .order("played_at", { ascending: true });
-
-    // Aggregate plays by day
+    const { data: recentPlays } = await supabase.from("recently_played").select("played_at").gte("played_at", thirtyDaysAgo).order("played_at", { ascending: true });
     const dailyPlays: Record<string, number> = {};
     (recentPlays || []).forEach((p: { played_at: string }) => {
       const day = p.played_at.substring(0, 10);
       dailyPlays[day] = (dailyPlays[day] || 0) + 1;
     });
 
-    return new Response(
-      JSON.stringify({
-        totalUsers: totalUsers || 0,
-        activeToday: activeToday || 0,
-        activeWeek: activeWeek || 0,
-        activeMonth: activeMonth || 0,
-        newToday: newToday || 0,
-        newMonth: newMonth || 0,
-        totalPlays: totalPlays || 0,
-        totalLikes: totalLikes || 0,
-        totalPlaylists: totalPlaylists || 0,
-        topArtists: topArtists || [],
-        topTracks: topTracks || [],
-        recentUsers: recentUsers || [],
-        dailyPlays,
-      }),
-      {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
-    );
+    return new Response(JSON.stringify({
+      totalUsers: totalUsers || 0, activeToday: activeToday || 0, activeWeek: activeWeek || 0,
+      activeMonth: activeMonth || 0, newToday: newToday || 0, newMonth: newMonth || 0,
+      totalPlays: totalPlays || 0, totalLikes: totalLikes || 0, totalPlaylists: totalPlaylists || 0,
+      topArtists: topArtists || [], topTracks: topTracks || [], recentUsers: recentUsers || [], dailyPlays,
+    }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (err) {
     return new Response(JSON.stringify({ error: "Server error" }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 });

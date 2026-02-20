@@ -20,6 +20,9 @@ import ProfilePage from "./pages/ProfilePage";
 import SettingsPage from "./pages/SettingsPage";
 import ArtistPage from "./pages/ArtistPage";
 import AlbumPage from "./pages/AlbumPage";
+import AnalyticsPage from "./pages/AnalyticsPage";
+import StoragePage from "./pages/StoragePage";
+import QueuePage from "./pages/QueuePage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -46,6 +49,9 @@ const App = () => (
                 <Route path="/settings" element={<SettingsPage />} />
                 <Route path="/artist/:id" element={<ArtistPage />} />
                 <Route path="/album/:id" element={<AlbumPage />} />
+                <Route path="/analytics" element={<AnalyticsPage />} />
+                <Route path="/storage" element={<StoragePage />} />
+                <Route path="/queue" element={<QueuePage />} />
               </Route>
               <Route path="/auth" element={<AuthPage />} />
               <Route path="/reset-password" element={<ResetPasswordPage />} />

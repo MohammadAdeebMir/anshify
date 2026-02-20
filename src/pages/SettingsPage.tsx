@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Settings, User, Lock, LogOut, Save, Palette, Music, Timer, Waves } from 'lucide-react';
+import { Settings, User, Lock, LogOut, Save, Palette, Music, Waves, Activity, HardDrive, BarChart3 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -14,9 +14,9 @@ import { useTheme, ThemeMode } from '@/contexts/ThemeContext';
 import { cn } from '@/lib/utils';
 
 const themes: { id: ThemeMode; name: string; desc: string; preview: string }[] = [
-  { id: 'default', name: 'Purple Haze', desc: 'Deep violet with purple accents', preview: 'bg-gradient-to-br from-purple-900 to-violet-800' },
-  { id: 'amoled', name: 'AMOLED Black', desc: 'Pure black for OLED screens', preview: 'bg-black border border-border/30' },
-  { id: 'midnight', name: 'Midnight Blue', desc: 'Deep navy with blue accents', preview: 'bg-gradient-to-br from-blue-950 to-slate-900' },
+  { id: 'default', name: 'Obsidian', desc: 'Deep black with purple accents', preview: 'bg-gradient-to-br from-[#0a0a0a] to-[#1a0a2a]' },
+  { id: 'amoled', name: 'AMOLED Pure', desc: 'True black for OLED displays', preview: 'bg-black border border-border/30' },
+  { id: 'midnight', name: 'Midnight', desc: 'Deep navy with blue glow', preview: 'bg-gradient-to-br from-[#050a15] to-[#0a1530]' },
 ];
 
 const crossfadeOptions: { label: string; value: CrossfadeMode }[] = [
@@ -31,7 +31,7 @@ const SettingsPage = () => {
   const { user, signOut, updatePassword, loading } = useAuth();
   const navigate = useNavigate();
   const { theme, setTheme } = useTheme();
-  const { crossfadeDuration, setCrossfadeDuration, volumeNormalization, setVolumeNormalization } = usePlayer();
+  const { crossfadeDuration, setCrossfadeDuration, volumeNormalization, setVolumeNormalization, visualizerEnabled, setVisualizerEnabled, workoutMode, setWorkoutMode, targetBPM, setTargetBPM } = usePlayer();
   const [displayName, setDisplayName] = useState('');
   const [avatarUrl, setAvatarUrl] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -61,7 +61,7 @@ const SettingsPage = () => {
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="glass rounded-3xl p-8 text-center space-y-4">
           <Settings className="h-12 w-12 text-muted-foreground mx-auto" />
           <h2 className="text-xl font-bold text-foreground">Sign in to access settings</h2>
-          <Button onClick={() => navigate('/auth')} className="bg-primary rounded-xl glow-primary">Sign In</Button>
+          <Button onClick={() => navigate('/auth')} className="bg-primary rounded-xl">Sign In</Button>
         </motion.div>
       </div>
     );
@@ -117,7 +117,7 @@ const SettingsPage = () => {
               onClick={() => setTheme(t.id)}
               className={cn(
                 'rounded-xl p-3 text-left transition-all border-2',
-                theme === t.id ? 'border-primary' : 'border-transparent hover:border-border/50'
+                theme === t.id ? 'border-primary' : 'border-transparent hover:border-border/40'
               )}
             >
               <div className={cn('h-12 rounded-lg mb-2', t.preview)} />
@@ -157,8 +157,57 @@ const SettingsPage = () => {
             </div>
             <Switch checked={volumeNormalization} onCheckedChange={setVolumeNormalization} />
           </div>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-foreground flex items-center gap-1.5"><Waves className="h-3.5 w-3.5 text-primary" /> Visualizer</p>
+              <p className="text-xs text-muted-foreground">Show audio visualizer in player</p>
+            </div>
+            <Switch checked={visualizerEnabled} onCheckedChange={setVisualizerEnabled} />
+          </div>
         </div>
       </SectionCard>
+
+      {/* Workout */}
+      <SectionCard icon={Activity} title="Workout Mode" delay={0.07}>
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-foreground">Enable Workout Mode</p>
+              <p className="text-xs text-muted-foreground">Match music to your pace</p>
+            </div>
+            <Switch checked={workoutMode} onCheckedChange={setWorkoutMode} />
+          </div>
+          {workoutMode && (
+            <div>
+              <Label className="text-foreground/80 text-sm mb-2 block">Target BPM: {targetBPM}</Label>
+              <input
+                type="range"
+                min={80}
+                max={200}
+                value={targetBPM}
+                onChange={e => setTargetBPM(Number(e.target.value))}
+                className="w-full accent-primary"
+              />
+              <div className="flex justify-between text-[10px] text-muted-foreground">
+                <span>Walking (80)</span>
+                <span>Running (160+)</span>
+              </div>
+            </div>
+          )}
+        </div>
+      </SectionCard>
+
+      {/* Quick links */}
+      <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.08 }} className="grid grid-cols-2 gap-3">
+        <Button onClick={() => navigate('/analytics')} variant="outline" className="rounded-xl border-border/30 h-auto py-3 flex-col gap-1">
+          <BarChart3 className="h-4 w-4 text-primary" />
+          <span className="text-xs">Analytics</span>
+        </Button>
+        <Button onClick={() => navigate('/storage')} variant="outline" className="rounded-xl border-border/30 h-auto py-3 flex-col gap-1">
+          <HardDrive className="h-4 w-4 text-primary" />
+          <span className="text-xs">Storage</span>
+        </Button>
+      </motion.div>
 
       {/* Profile */}
       <SectionCard icon={User} title="Profile" delay={0.1}>

@@ -17,9 +17,9 @@ export const ArtistCircle = ({ artist, index }: ArtistCircleProps) => {
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.3, delay: index * 0.05, type: 'spring' }}
       onClick={() => play(artist.topTrack, [artist.topTrack])}
-      className="group snap-start flex-shrink-0 flex flex-col items-center gap-2 w-[110px] sm:w-[130px]"
+      className="group snap-start flex-shrink-0 flex flex-col items-center gap-2 w-[90px] sm:w-[110px]"
     >
-      <div className="relative h-24 w-24 sm:h-28 sm:w-28 rounded-full overflow-hidden shadow-lg shadow-black/30 ring-2 ring-transparent group-hover:ring-primary/50 transition-all duration-300">
+      <div className="relative h-20 w-20 sm:h-24 sm:w-24 rounded-full overflow-hidden shadow-lg shadow-black/40 ring-2 ring-border/30 group-hover:ring-primary/50 transition-all duration-300">
         {artist.image ? (
           <img
             src={artist.image}
@@ -29,14 +29,14 @@ export const ArtistCircle = ({ artist, index }: ArtistCircleProps) => {
           />
         ) : (
           <div className="h-full w-full bg-muted flex items-center justify-center">
-            <Play className="h-6 w-6 text-muted-foreground" />
+            <Play className="h-5 w-5 text-muted-foreground" />
           </div>
         )}
         <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center">
-          <Play className="h-6 w-6 text-primary-foreground opacity-0 group-hover:opacity-100 transition-opacity ml-0.5" />
+          <Play className="h-5 w-5 text-primary-foreground opacity-0 group-hover:opacity-100 transition-opacity ml-0.5" />
         </div>
       </div>
-      <p className="text-xs font-medium text-foreground truncate w-full text-center">{artist.name}</p>
+      <p className="text-[11px] font-medium text-foreground truncate w-full text-center">{artist.name}</p>
     </motion.button>
   );
 };

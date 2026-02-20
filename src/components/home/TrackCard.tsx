@@ -20,9 +20,9 @@ export const TrackCard = ({ track, tracks, index = 0 }: TrackCardProps) => {
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.35, delay: index * 0.04, type: 'spring', stiffness: 200 }}
       onClick={() => play(track, tracks)}
-      className="group snap-start flex-shrink-0 w-[160px] sm:w-[180px] text-left"
+      className="group snap-start flex-shrink-0 w-[140px] sm:w-[160px] text-left"
     >
-      <div className="relative aspect-square rounded-xl overflow-hidden mb-3 shadow-lg shadow-black/30">
+      <div className="relative aspect-square rounded-2xl overflow-hidden mb-2 shadow-lg shadow-black/40">
         {track.album_image ? (
           <img
             src={track.album_image}
@@ -36,26 +36,26 @@ export const TrackCard = ({ track, tracks, index = 0 }: TrackCardProps) => {
           </div>
         )}
         <div className={cn(
-          'absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-all duration-300 flex items-end justify-end p-3',
-          isActive && 'bg-black/20'
+          'absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent',
+          'opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-end justify-end p-2.5',
+          isActive && 'opacity-100'
         )}>
           <div className={cn(
-            'h-11 w-11 rounded-full bg-primary flex items-center justify-center shadow-xl',
-            'transform translate-y-2 opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-300',
-            isActive && 'translate-y-0 opacity-100'
+            'h-10 w-10 rounded-full bg-primary flex items-center justify-center shadow-xl shadow-primary/30',
+            'transform translate-y-1 group-hover:translate-y-0 transition-transform duration-300'
           )}>
             {isActive && isPlaying ? (
-              <Pause className="h-5 w-5 text-primary-foreground fill-current" />
+              <Pause className="h-4.5 w-4.5 text-primary-foreground fill-current" />
             ) : (
-              <Play className="h-5 w-5 text-primary-foreground fill-current ml-0.5" />
+              <Play className="h-4.5 w-4.5 text-primary-foreground fill-current ml-0.5" />
             )}
           </div>
         </div>
       </div>
-      <p className={cn('text-sm font-semibold truncate', isActive ? 'text-primary' : 'text-foreground')}>
+      <p className={cn('text-xs font-semibold truncate', isActive ? 'text-primary' : 'text-foreground')}>
         {track.name}
       </p>
-      <p className="text-xs text-muted-foreground truncate mt-0.5">{track.artist_name}</p>
+      <p className="text-[10px] text-muted-foreground truncate mt-0.5">{track.artist_name}</p>
     </motion.button>
   );
 };

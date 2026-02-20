@@ -1,11 +1,11 @@
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
-import { TrendingUp, Music2, Sparkles, Clock, Users, Zap } from 'lucide-react';
+import { TrendingUp, Music2, Sparkles, Clock, Users, Zap, Headphones } from 'lucide-react';
 import { getTrendingYT, getNewReleasesYT } from '@/services/ytmusic';
 import { usePlayer } from '@/contexts/PlayerContext';
 import { useAuth } from '@/hooks/useAuth';
 import { useRecentlyPlayed } from '@/hooks/useLibrary';
-import { useLocalRecommendations, usePopularArtists } from '@/hooks/useRecommendations';
+import { useLocalRecommendations, usePopularArtists, useMoodSections } from '@/hooks/useRecommendations';
 import { useAIRecommendations, useDailyMixes } from '@/hooks/useAI';
 import { Track } from '@/types/music';
 import { HorizontalCarousel } from '@/components/home/HorizontalCarousel';
@@ -54,6 +54,7 @@ const Index = () => {
   const { data: popularArtists, isLoading: loadingArtists } = usePopularArtists();
   const { data: aiRecs } = useAIRecommendations();
   const { data: dailyMixes } = useDailyMixes();
+  const { data: moodSections, isLoading: loadingMoods } = useMoodSections();
 
   const hours = new Date().getHours();
   const greeting = hours < 12 ? 'Good morning' : hours < 18 ? 'Good afternoon' : 'Good evening';
@@ -131,7 +132,23 @@ const Index = () => {
         </>
       )}
 
-      {/* --- Popular Artists --- */}
+      {/* --- Mood Sections --- */}
+      {moodSections && moodSections.length > 0 && (
+        <>
+          {moodSections.map((section, i) => (
+            <Section key={section.label} title={`${section.emoji} ${section.label}`} icon={Headphones} delay={nextDelay()} showSeeAll>
+              <HorizontalCarousel>
+                {section.tracks.map((track, j) => (
+                  <TrackCard key={track.id} track={track} tracks={section.tracks} index={j} />
+                ))}
+              </HorizontalCarousel>
+            </Section>
+          ))}
+        </>
+      )}
+      {loadingMoods && <CarouselSkeleton />}
+
+
       <Section title="Popular Artists" icon={Users} delay={nextDelay()} showSeeAll>
         {loadingArtists ? <ArtistCarouselSkeleton /> : (
           <HorizontalCarousel>

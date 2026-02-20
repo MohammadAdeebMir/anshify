@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Radio, Smile, Frown, Brain, Dumbbell, Moon, Heart, PartyPopper, Coffee, Sparkles } from 'lucide-react';
+import { Radio, Smile, Frown, Brain, Dumbbell, Moon, Heart, PartyPopper, Coffee, Sparkles, Play, Pause } from 'lucide-react';
 import { useMoodTracks } from '@/hooks/useAI';
 import { usePlayer } from '@/contexts/PlayerContext';
 import { useAuth } from '@/hooks/useAuth';
@@ -8,7 +8,7 @@ import { useLikedSongs, useLikeTrack } from '@/hooks/useLibrary';
 import { AddToPlaylistButton } from '@/components/AddToPlaylistButton';
 import { Track } from '@/types/music';
 import { SongListSkeleton } from '@/components/skeletons/Skeletons';
-import { getTracksByGenre } from '@/services/jamendo';
+import { getTracksByGenreYT } from '@/services/ytmusic';
 import { useQuery } from '@tanstack/react-query';
 import { AIPlaylistGenerator } from '@/components/AIPlaylistGenerator';
 import { cn } from '@/lib/utils';
@@ -31,7 +31,7 @@ const genres = [
 ];
 
 const TrackRow = ({ track, tracks }: { track: Track; tracks: Track[] }) => {
-  const { play, currentTrack } = usePlayer();
+  const { play, currentTrack, isPlaying } = usePlayer();
   const { user } = useAuth();
   const { likedSongs } = useLikedSongs();
   const { isLiked, toggleLike } = useLikeTrack();
@@ -39,27 +39,38 @@ const TrackRow = ({ track, tracks }: { track: Track; tracks: Track[] }) => {
   const liked = isLiked(track.id, likedSongs);
 
   return (
-    <div className={cn('flex items-center gap-3 p-3 rounded-lg transition-colors hover:bg-muted/30', isActive && 'bg-primary/10')}>
-      <button onClick={() => play(track, tracks)} className="flex items-center gap-3 flex-1 min-w-0 text-left">
-        <div className="h-10 w-10 rounded-md overflow-hidden flex-shrink-0">
-          <img src={track.album_image} alt={track.album_name} className="h-full w-full object-cover" />
+    <div className={cn('flex items-center gap-3 p-3 rounded-2xl transition-all hover:bg-muted/50', isActive && 'bg-primary/10 ring-1 ring-primary/20')}>
+      <button onClick={() => play(track, tracks)} className="flex items-center gap-3 flex-1 min-w-0 text-left group">
+        <div className="relative h-12 w-12 rounded-xl overflow-hidden flex-shrink-0 shadow-lg">
+          {track.album_image ? (
+            <img src={track.album_image} alt={track.album_name} className="h-full w-full object-cover" loading="lazy" />
+          ) : (
+            <div className="h-full w-full bg-muted flex items-center justify-center"><Play className="h-4 w-4 text-muted-foreground" /></div>
+          )}
+          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center">
+            <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+              {isActive && isPlaying ? <Pause className="h-5 w-5 text-white" /> : <Play className="h-5 w-5 text-white ml-0.5" />}
+            </div>
+          </div>
         </div>
         <div className="flex-1 min-w-0">
-          <p className={cn('text-sm font-medium truncate', isActive ? 'text-primary' : 'text-foreground')}>{track.name}</p>
+          <p className={cn('text-sm font-semibold truncate', isActive ? 'text-primary' : 'text-foreground')}>{track.name}</p>
           <p className="text-xs text-muted-foreground truncate">{track.artist_name}</p>
         </div>
       </button>
       {user && (
         <>
-          <button onClick={() => toggleLike.mutate({ track, liked })} className={cn('p-1.5 rounded-full transition-colors', liked ? 'text-primary' : 'text-muted-foreground hover:text-foreground')}>
+          <button onClick={() => toggleLike.mutate({ track, liked })} className={cn('p-2 rounded-full transition-colors', liked ? 'text-primary' : 'text-muted-foreground hover:text-foreground')}>
             <Heart className={cn('h-4 w-4', liked && 'fill-current')} />
           </button>
           <AddToPlaylistButton track={track} />
         </>
       )}
-      <span className="text-xs text-muted-foreground tabular-nums">
-        {Math.floor(track.duration / 60)}:{String(track.duration % 60).padStart(2, '0')}
-      </span>
+      {track.duration > 0 && (
+        <span className="text-xs text-muted-foreground tabular-nums">
+          {Math.floor(track.duration / 60)}:{String(track.duration % 60).padStart(2, '0')}
+        </span>
+      )}
     </div>
   );
 };
@@ -70,8 +81,8 @@ const BrowsePage = () => {
 
   const { data: moodTracks, isLoading: loadingMood } = useMoodTracks(selectedMood);
   const { data: genreTracks, isLoading: loadingGenre } = useQuery({
-    queryKey: ['genre-browse', selectedGenre],
-    queryFn: () => getTracksByGenre(selectedGenre!, 20),
+    queryKey: ['genre-browse-yt', selectedGenre],
+    queryFn: () => getTracksByGenreYT(selectedGenre!, 20),
     enabled: !!selectedGenre,
     staleTime: 5 * 60 * 1000,
   });
@@ -90,12 +101,10 @@ const BrowsePage = () => {
         <p className="text-muted-foreground text-sm">Explore by mood, genre, or AI prompt</p>
       </motion.div>
 
-      {/* AI Playlist Generator */}
       <motion.section initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className="glass rounded-2xl p-6">
         <AIPlaylistGenerator />
       </motion.section>
 
-      {/* Mood selector */}
       <section className="space-y-3">
         <h2 className="text-lg font-bold text-foreground">Moods</h2>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -116,7 +125,6 @@ const BrowsePage = () => {
         </div>
       </section>
 
-      {/* Genre selector */}
       <section className="space-y-3">
         <h2 className="text-lg font-bold text-foreground">Genres</h2>
         <div className="flex flex-wrap gap-2">
@@ -137,13 +145,12 @@ const BrowsePage = () => {
         </div>
       </section>
 
-      {/* Results */}
       <AnimatePresence mode="wait">
         {activeLabel && (
           <motion.section key={activeLabel} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-3">
             <div className="flex items-center gap-3">
               <h2 className="text-xl font-bold text-foreground">{activeLabel}</h2>
-              <button onClick={() => { setSelectedMood(null); setSelectedGenre(null); }} className="text-xs text-muted-foreground hover:text-foreground">✕ Clear</button>
+              <button onClick={() => { setSelectedMood(null); setSelectedGenre(null); }} className="text-xs text-muted-foreground hover:text-foreground px-2 py-1 rounded-lg hover:bg-muted/50 transition-colors">✕ Clear</button>
             </div>
             {isLoading ? (
               <div className="glass rounded-2xl overflow-hidden"><SongListSkeleton count={5} /></div>

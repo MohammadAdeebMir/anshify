@@ -1,5 +1,5 @@
 import { usePlayer } from '@/contexts/PlayerContext';
-import { Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, Shuffle, Repeat, Repeat1, Timer, ChevronDown, Heart, ListMusic, Waves, Activity } from 'lucide-react';
+import { Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, Shuffle, Repeat, Repeat1, Timer, ChevronDown, Heart, ListMusic, Waves, Activity, Loader2 } from 'lucide-react';
 import { Slider } from '@/components/ui/slider';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -54,22 +54,27 @@ export const PlayerBar = () => {
   };
 
   const upcomingCount = queue.length - queueIndex - 1;
+  const progressPercent = duration > 0 ? (progress / duration) * 100 : 0;
 
-  // Mobile expanded full-screen player
+  // Mobile expanded full-screen player — Luxury Mode
   if (isMobile && expanded) {
     return (
       <motion.div
         initial={{ y: '100%' }}
         animate={{ y: 0 }}
         exit={{ y: '100%' }}
-        transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-        className="fixed inset-0 z-50 flex flex-col bg-background pb-[env(safe-area-inset-bottom)]"
+        transition={{ type: 'spring', damping: 28, stiffness: 280 }}
+        className="fixed inset-0 z-50 flex flex-col pb-[env(safe-area-inset-bottom)]"
+        style={{
+          background: 'linear-gradient(180deg, hsl(var(--background)) 0%, hsl(var(--card)) 100%)',
+        }}
       >
+        {/* Top bar */}
         <div className="flex items-center justify-between px-4 py-3">
-          <button onClick={() => setExpanded(false)} className="p-2 text-muted-foreground">
+          <button onClick={() => setExpanded(false)} className="p-2 text-muted-foreground hover:text-foreground transition-colors">
             <ChevronDown className="h-6 w-6" />
           </button>
-          <span className="text-xs text-muted-foreground uppercase tracking-wider">Now Playing</span>
+          <span className="text-xs text-muted-foreground uppercase tracking-[0.2em] font-medium">Now Playing</span>
           <div className="flex items-center gap-1">
             <SleepTimerPopover />
             <button onClick={() => { setExpanded(false); navigate('/queue'); }} className="p-2 text-muted-foreground relative">
@@ -81,6 +86,7 @@ export const PlayerBar = () => {
           </div>
         </div>
 
+        {/* Album art with glow */}
         <motion.div
           className="flex-1 flex flex-col items-center justify-center px-8 gap-6"
           drag="x"
@@ -90,13 +96,37 @@ export const PlayerBar = () => {
           onTap={handleDoubleTap}
         >
           {visualizerEnabled ? (
-            <MusicVisualizer className="w-64 h-64 rounded-2xl overflow-hidden" />
+            <MusicVisualizer className="w-72 h-72 rounded-3xl overflow-hidden" />
           ) : (
-            <div className="w-64 h-64 rounded-2xl overflow-hidden glow-primary shadow-2xl">
-              <img src={currentTrack.album_image} alt={currentTrack.album_name} className="h-full w-full object-cover" />
-            </div>
+            <motion.div
+              animate={isPlaying ? { scale: [1, 1.02, 1] } : { scale: 1 }}
+              transition={{ repeat: Infinity, duration: 4, ease: 'easeInOut' }}
+              className="relative"
+            >
+              <div className="w-72 h-72 rounded-3xl overflow-hidden shadow-2xl ring-1 ring-white/5">
+                {currentTrack.album_image ? (
+                  <img src={currentTrack.album_image} alt={currentTrack.album_name} className="h-full w-full object-cover" />
+                ) : (
+                  <div className="h-full w-full bg-muted flex items-center justify-center">
+                    <Play className="h-12 w-12 text-muted-foreground" />
+                  </div>
+                )}
+              </div>
+              {/* Soft glow behind art */}
+              {isPlaying && currentTrack.album_image && (
+                <div
+                  className="absolute -inset-8 -z-10 rounded-[2rem] opacity-30 blur-3xl"
+                  style={{
+                    backgroundImage: `url(${currentTrack.album_image})`,
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center',
+                  }}
+                />
+              )}
+            </motion.div>
           )}
-          <div className="text-center w-full max-w-xs">
+
+          <div className="text-center w-full max-w-xs space-y-1">
             <p className="text-lg font-bold truncate text-foreground">{currentTrack.name}</p>
             <p className="text-sm text-muted-foreground truncate">{currentTrack.artist_name}</p>
           </div>
@@ -105,45 +135,46 @@ export const PlayerBar = () => {
             {user && (
               <button
                 onClick={() => toggleLike.mutate({ track: currentTrack, liked })}
-                className={cn('p-2 rounded-full transition-colors', liked ? 'text-primary' : 'text-muted-foreground')}
+                className={cn('p-2.5 rounded-full transition-all', liked ? 'text-primary scale-110' : 'text-muted-foreground hover:text-foreground')}
               >
                 <Heart className={cn('h-5 w-5', liked && 'fill-current')} />
               </button>
             )}
-            <button onClick={() => player.setVisualizerEnabled(!visualizerEnabled)} className={cn('p-2 rounded-full transition-colors', visualizerEnabled ? 'text-primary' : 'text-muted-foreground')}>
+            <button onClick={() => player.setVisualizerEnabled(!visualizerEnabled)} className={cn('p-2.5 rounded-full transition-colors', visualizerEnabled ? 'text-primary' : 'text-muted-foreground')}>
               <Waves className="h-5 w-5" />
             </button>
-            <button onClick={() => player.setWorkoutMode(!workoutMode)} className={cn('p-2 rounded-full transition-colors', workoutMode ? 'text-primary' : 'text-muted-foreground')}>
+            <button onClick={() => player.setWorkoutMode(!workoutMode)} className={cn('p-2.5 rounded-full transition-colors', workoutMode ? 'text-primary' : 'text-muted-foreground')}>
               <Activity className="h-5 w-5" />
             </button>
           </div>
         </motion.div>
 
-        {/* Seek */}
+        {/* Seek bar */}
         <div className="px-8 space-y-1">
           <Slider value={[progress]} max={duration || 100} step={0.1} onValueChange={([v]) => player.seek(v)} className="h-2" />
           <div className="flex justify-between">
-            <span className="text-[10px] text-muted-foreground">{formatTime(progress)}</span>
-            <span className="text-[10px] text-muted-foreground">{formatTime(duration)}</span>
+            <span className="text-[10px] text-muted-foreground tabular-nums">{formatTime(progress)}</span>
+            <span className="text-[10px] text-muted-foreground tabular-nums">{formatTime(duration)}</span>
           </div>
         </div>
 
         {/* Controls */}
-        <div className="flex items-center justify-center gap-6 py-6">
+        <div className="flex items-center justify-center gap-7 py-6">
           <button onClick={player.toggleShuffle} className={cn('p-2', shuffle ? 'text-primary' : 'text-muted-foreground')}>
             <Shuffle className="h-5 w-5" />
           </button>
-          <button onClick={player.previous} className="p-2 text-foreground">
-            <SkipBack className="h-6 w-6" />
+          <button onClick={player.previous} className="p-2 text-foreground active:scale-90 transition-transform">
+            <SkipBack className="h-7 w-7" />
           </button>
-          <button
+          <motion.button
+            whileTap={{ scale: 0.9 }}
             onClick={isPlaying ? player.pause : player.resume}
-            className="p-4 rounded-full bg-foreground text-background"
+            className="p-5 rounded-full bg-foreground text-background shadow-xl"
           >
-            {isPlaying ? <Pause className="h-6 w-6" /> : <Play className="h-6 w-6 ml-0.5" />}
-          </button>
-          <button onClick={player.next} className="p-2 text-foreground">
-            <SkipForward className="h-6 w-6" />
+            {isPlaying ? <Pause className="h-7 w-7" /> : <Play className="h-7 w-7 ml-0.5" />}
+          </motion.button>
+          <button onClick={player.next} className="p-2 text-foreground active:scale-90 transition-transform">
+            <SkipForward className="h-7 w-7" />
           </button>
           <button onClick={player.toggleRepeat} className={cn('p-2', repeat !== 'off' ? 'text-primary' : 'text-muted-foreground')}>
             {repeat === 'one' ? <Repeat1 className="h-5 w-5" /> : <Repeat className="h-5 w-5" />}
@@ -168,6 +199,7 @@ export const PlayerBar = () => {
     );
   }
 
+  // Mini player
   return (
     <>
       <QueuePanel open={queueOpen} onClose={() => setQueueOpen(false)} />
@@ -177,19 +209,28 @@ export const PlayerBar = () => {
           animate={{ y: 0, opacity: 1 }}
           exit={{ y: 80, opacity: 0 }}
           className={cn(
-            'fixed left-0 right-0 z-30 glass-strong',
+            'fixed left-0 right-0 z-30',
             isMobile ? 'bottom-14 pb-0' : 'bottom-0'
           )}
         >
-          {/* Progress bar on top for mobile */}
+          {/* Glass background with enhanced blur */}
+          <div className="absolute inset-0 glass-strong rounded-t-2xl" />
+
+          {/* Animated progress bar on top for mobile */}
           {isMobile && (
-            <div className="px-4 pt-2">
-              <Slider value={[progress]} max={duration || 100} step={0.1} onValueChange={([v]) => player.seek(v)} className="h-1" />
+            <div className="relative px-4 pt-2 z-10">
+              <div className="h-[3px] rounded-full bg-muted/40 overflow-hidden">
+                <motion.div
+                  className="h-full bg-primary rounded-full"
+                  style={{ width: `${progressPercent}%` }}
+                  transition={{ duration: 0.3, ease: 'linear' }}
+                />
+              </div>
             </div>
           )}
 
           <motion.div
-            className={cn('flex items-center gap-4 px-4', isMobile ? 'h-16' : 'h-20')}
+            className={cn('flex items-center gap-4 px-4 relative z-10', isMobile ? 'h-16' : 'h-20')}
             drag={isMobile ? 'x' : false}
             dragConstraints={{ left: 0, right: 0 }}
             dragElastic={0.3}
@@ -200,11 +241,17 @@ export const PlayerBar = () => {
               onClick={() => isMobile && setExpanded(true)}
               className="flex items-center gap-3 flex-1 min-w-0 text-left"
             >
-              <div className={cn('rounded-lg overflow-hidden flex-shrink-0', isMobile ? 'h-10 w-10' : 'h-14 w-14')}>
-                <img src={currentTrack.album_image} alt={currentTrack.album_name} className="h-full w-full object-cover" loading="lazy" />
+              <div className={cn('rounded-xl overflow-hidden flex-shrink-0 shadow-lg', isMobile ? 'h-11 w-11' : 'h-14 w-14')}>
+                {currentTrack.album_image ? (
+                  <img src={currentTrack.album_image} alt={currentTrack.album_name} className="h-full w-full object-cover" loading="lazy" />
+                ) : (
+                  <div className="h-full w-full bg-muted flex items-center justify-center">
+                    <Play className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                )}
               </div>
               <div className="min-w-0">
-                <p className="text-sm font-medium truncate text-foreground">{currentTrack.name}</p>
+                <p className="text-sm font-semibold truncate text-foreground">{currentTrack.name}</p>
                 <p className="text-xs truncate text-muted-foreground">{currentTrack.artist_name}</p>
               </div>
             </button>
@@ -213,7 +260,7 @@ export const PlayerBar = () => {
             {!isMobile && user && (
               <button
                 onClick={() => toggleLike.mutate({ track: currentTrack, liked })}
-                className={cn('p-1.5 rounded-full transition-colors', liked ? 'text-primary' : 'text-muted-foreground hover:text-foreground')}
+                className={cn('p-1.5 rounded-full transition-all', liked ? 'text-primary scale-110' : 'text-muted-foreground hover:text-foreground')}
               >
                 <Heart className={cn('h-4 w-4', liked && 'fill-current')} />
               </button>
@@ -227,16 +274,17 @@ export const PlayerBar = () => {
                     <Shuffle className="h-4 w-4" />
                   </button>
                 )}
-                <button onClick={player.previous} className="p-1.5 text-muted-foreground hover:text-foreground transition-colors">
+                <button onClick={player.previous} className="p-1.5 text-muted-foreground hover:text-foreground transition-colors active:scale-90">
                   <SkipBack className="h-4 w-4" />
                 </button>
-                <button
+                <motion.button
+                  whileTap={{ scale: 0.9 }}
                   onClick={isPlaying ? player.pause : player.resume}
-                  className="p-2.5 rounded-full bg-foreground text-background hover:scale-105 transition-transform"
+                  className="p-2.5 rounded-full bg-foreground text-background shadow-lg"
                 >
                   {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4 ml-0.5" />}
-                </button>
-                <button onClick={player.next} className="p-1.5 text-muted-foreground hover:text-foreground transition-colors">
+                </motion.button>
+                <button onClick={player.next} className="p-1.5 text-muted-foreground hover:text-foreground transition-colors active:scale-90">
                   <SkipForward className="h-4 w-4" />
                 </button>
                 {!isMobile && (
@@ -249,9 +297,9 @@ export const PlayerBar = () => {
               {/* Desktop seek bar */}
               {!isMobile && (
                 <div className="flex items-center gap-2 w-full max-w-md">
-                  <span className="text-[10px] text-muted-foreground w-8 text-right">{formatTime(progress)}</span>
+                  <span className="text-[10px] text-muted-foreground w-8 text-right tabular-nums">{formatTime(progress)}</span>
                   <Slider value={[progress]} max={duration || 100} step={0.1} onValueChange={([v]) => player.seek(v)} className="flex-1" />
-                  <span className="text-[10px] text-muted-foreground w-8">{formatTime(duration)}</span>
+                  <span className="text-[10px] text-muted-foreground w-8 tabular-nums">{formatTime(duration)}</span>
                 </div>
               )}
             </div>

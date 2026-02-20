@@ -3,7 +3,7 @@ import { Sparkles, Save, Play, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { supabase } from '@/integrations/supabase/client';
-import { searchTracks } from '@/services/jamendo';
+import { searchYTMusic } from '@/services/ytmusic';
 import { Track } from '@/types/music';
 import { usePlayer } from '@/contexts/PlayerContext';
 import { useAuth } from '@/hooks/useAuth';
@@ -52,7 +52,7 @@ export const AIPlaylistGenerator = () => {
       const seen = new Set<string>();
       for (const q of queries.slice(0, 5)) {
         try {
-          const results = await searchTracks(q, 5);
+          const results = await searchYTMusic(q, 5);
           for (const t of results) {
             if (!seen.has(t.id)) { seen.add(t.id); allTracks.push(t); }
           }
@@ -100,7 +100,6 @@ export const AIPlaylistGenerator = () => {
         </Button>
       </div>
 
-      {/* Quick prompts */}
       <div className="flex flex-wrap gap-1.5">
         {PROMPT_EXAMPLES.map(ex => (
           <button
@@ -141,16 +140,24 @@ export const AIPlaylistGenerator = () => {
                     onClick={() => play(track, tracks)}
                     className={cn('flex items-center gap-3 p-3 w-full text-left hover:bg-muted/30 transition-colors', isActive && 'bg-primary/10')}
                   >
-                    <div className="h-10 w-10 rounded-md overflow-hidden shrink-0">
-                      <img src={track.album_image} alt="" className="h-full w-full object-cover" />
+                    <div className="h-10 w-10 rounded-xl overflow-hidden shrink-0">
+                      {track.album_image ? (
+                        <img src={track.album_image} alt="" className="h-full w-full object-cover" loading="lazy" />
+                      ) : (
+                        <div className="h-full w-full bg-muted flex items-center justify-center">
+                          <Play className="h-4 w-4 text-muted-foreground" />
+                        </div>
+                      )}
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className={cn('text-sm font-medium truncate', isActive ? 'text-primary' : 'text-foreground')}>{track.name}</p>
                       <p className="text-xs text-muted-foreground truncate">{track.artist_name}</p>
                     </div>
-                    <span className="text-xs text-muted-foreground tabular-nums">
-                      {Math.floor(track.duration / 60)}:{String(track.duration % 60).padStart(2, '0')}
-                    </span>
+                    {track.duration > 0 && (
+                      <span className="text-xs text-muted-foreground tabular-nums">
+                        {Math.floor(track.duration / 60)}:{String(track.duration % 60).padStart(2, '0')}
+                      </span>
+                    )}
                   </button>
                 );
               })}

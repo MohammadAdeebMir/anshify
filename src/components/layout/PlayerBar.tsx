@@ -177,8 +177,8 @@ export const PlayerBar = () => {
           animate={{ y: 0, opacity: 1 }}
           exit={{ y: 80, opacity: 0 }}
           className={cn(
-            'fixed bottom-0 left-0 right-0 z-50 glass-strong',
-            isMobile ? 'pb-[env(safe-area-inset-bottom)]' : ''
+            'fixed left-0 right-0 z-30 glass-strong',
+            isMobile ? 'bottom-14 pb-0' : 'bottom-0'
           )}
         >
           {/* Progress bar on top for mobile */}

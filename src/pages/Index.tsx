@@ -1,12 +1,13 @@
 import { useQuery } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
-import { TrendingUp, Music2, Sparkles, Clock, Users, Zap, Headphones } from 'lucide-react';
-import { getTrendingYT, getNewReleasesYT } from '@/services/ytmusic';
+import { TrendingUp, Music2, Sparkles, Clock, Users, Headphones, Zap } from 'lucide-react';
+import { getTrendingYT, getNewReleasesYT, searchYTMusic } from '@/services/ytmusic';
 import { usePlayer } from '@/contexts/PlayerContext';
 import { useAuth } from '@/hooks/useAuth';
 import { useRecentlyPlayed } from '@/hooks/useLibrary';
 import { useLocalRecommendations, usePopularArtists, useMoodSections } from '@/hooks/useRecommendations';
 import { useAIRecommendations, useDailyMixes } from '@/hooks/useAI';
+import { loadTasteProfile } from '@/services/tasteProfile';
 import { Track } from '@/types/music';
 import { HorizontalCarousel } from '@/components/home/HorizontalCarousel';
 import { TrackCard } from '@/components/home/TrackCard';
@@ -16,22 +17,26 @@ import { ContinueListeningSkeleton, CarouselSkeleton, ArtistCarouselSkeleton } f
 import { DailyMixCard } from '@/components/home/DailyMixCard';
 
 // --- Section wrapper ---
-const Section = ({ title, icon: Icon, children, delay = 0, subtitle, showSeeAll }: {
-  title: string; icon: React.ElementType; children: React.ReactNode; delay?: number; subtitle?: string; showSeeAll?: boolean;
+const Section = ({ title, icon: Icon, children, delay = 0, subtitle, showSeeAll, emoji }: {
+  title: string; icon: React.ElementType; children: React.ReactNode; delay?: number; subtitle?: string; showSeeAll?: boolean; emoji?: string;
 }) => (
   <motion.section
-    initial={{ opacity: 0, y: 16 }}
+    initial={{ opacity: 0, y: 18 }}
     animate={{ opacity: 1, y: 0 }}
     transition={{ duration: 0.45, delay, type: 'spring', stiffness: 130, damping: 22 }}
     className="space-y-3"
   >
     <div className="flex items-center justify-between">
-      <div className="flex items-center gap-2">
-        <Icon className="h-4 w-4 text-primary" />
-        <h2 className="text-base font-bold text-foreground">{title}</h2>
+      <div className="flex items-center gap-2.5">
+        {emoji ? (
+          <span className="text-lg leading-none">{emoji}</span>
+        ) : (
+          <Icon className="h-4 w-4 text-primary" />
+        )}
+        <h2 className="text-[15px] font-bold text-foreground tracking-tight">{title}</h2>
       </div>
       {showSeeAll && (
-        <span className="text-[11px] font-medium text-muted-foreground cursor-pointer hover:text-foreground transition-colors">
+        <span className="text-[11px] font-medium text-muted-foreground cursor-pointer hover:text-primary transition-colors">
           See All
         </span>
       )}
@@ -41,55 +46,130 @@ const Section = ({ title, icon: Icon, children, delay = 0, subtitle, showSeeAll 
   </motion.section>
 );
 
+// Fallback trending queries for fresh/new users
+const FALLBACK_QUERIES = [
+  { query: 'top hits 2025 popular', label: 'Top Hits Right Now', emoji: '🔥' },
+  { query: 'viral songs trending', label: 'Going Viral', emoji: '📈' },
+  { query: 'best songs of all time', label: 'All-Time Classics', emoji: '⭐' },
+  { query: 'chill hits relax', label: 'Chill Vibes', emoji: '🌊' },
+];
+
+function useFallbackSections() {
+  return useQuery({
+    queryKey: ['home-fallback-sections'],
+    queryFn: async () => {
+      const results = await Promise.allSettled(
+        FALLBACK_QUERIES.map(async ({ query, label, emoji }) => {
+          const tracks = await searchYTMusic(query, 12);
+          return { label, emoji, tracks };
+        })
+      );
+      return results
+        .filter((r): r is PromiseFulfilledResult<{ label: string; emoji: string; tracks: Track[] }> =>
+          r.status === 'fulfilled' && r.value.tracks.length > 0
+        )
+        .map(r => r.value);
+    },
+    staleTime: 15 * 60 * 1000,
+    retry: 1,
+  });
+}
+
 const Index = () => {
   const { user } = useAuth();
   const { recentlyPlayed, isLoading: loadingRecent } = useRecentlyPlayed();
   const { data: trending, isLoading: loadingTrending } = useQuery({
-    queryKey: ['trending-yt'], queryFn: () => getTrendingYT(12), staleTime: 5 * 60 * 1000,
+    queryKey: ['trending-yt'], queryFn: () => getTrendingYT(16), staleTime: 5 * 60 * 1000,
   });
   const { data: newReleases, isLoading: loadingReleases } = useQuery({
-    queryKey: ['new-releases-yt'], queryFn: () => getNewReleasesYT(12), staleTime: 5 * 60 * 1000,
+    queryKey: ['new-releases-yt'], queryFn: () => getNewReleasesYT(16), staleTime: 5 * 60 * 1000,
   });
   const { data: localRecs } = useLocalRecommendations();
   const { data: popularArtists, isLoading: loadingArtists } = usePopularArtists();
   const { data: aiRecs } = useAIRecommendations();
   const { data: dailyMixes } = useDailyMixes();
   const { data: moodSections, isLoading: loadingMoods } = useMoodSections();
+  const { data: fallbackSections, isLoading: loadingFallback } = useFallbackSections();
+
+  // Determine user "experience level" to weight personalization
+  const tasteProfile = loadTasteProfile();
+  const isNewUser = tasteProfile.topArtists.length < 2;
+  const hasPersonalization = (localRecs?.length ?? 0) > 0 || (aiRecs?.length ?? 0) > 0;
 
   const hours = new Date().getHours();
-  const greeting = hours < 12 ? 'Good morning' : hours < 18 ? 'Good afternoon' : 'Good evening';
+  const greeting = hours < 5 ? 'Good night' : hours < 12 ? 'Good morning' : hours < 18 ? 'Good afternoon' : 'Good evening';
+  const greetingEmoji = hours < 5 ? '🌙' : hours < 12 ? '☀️' : hours < 18 ? '🌤️' : '🌆';
 
   let sectionDelay = 0;
   const nextDelay = () => { sectionDelay += 0.05; return sectionDelay; };
 
   return (
-    <div className="p-4 sm:p-5 space-y-6 sm:space-y-7 max-w-7xl mx-auto pb-32">
+    <div className="p-4 sm:p-5 space-y-7 sm:space-y-8 max-w-7xl mx-auto pb-36">
       {/* --- Greeting Header --- */}
       <motion.div
-        initial={{ opacity: 0, y: -10 }}
+        initial={{ opacity: 0, y: -12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, type: 'spring', stiffness: 120 }}
-        className="relative pt-2"
+        className="relative pt-1"
       >
-        {/* Ambient glow */}
-        <div className="absolute -top-16 -left-16 w-72 h-72 rounded-full bg-primary/5 blur-3xl pointer-events-none" />
-        <div className="absolute -top-8 right-0 w-48 h-48 rounded-full bg-accent/4 blur-3xl pointer-events-none" />
+        <div className="absolute -top-16 -left-16 w-80 h-80 rounded-full bg-primary/6 blur-3xl pointer-events-none" />
+        <div className="absolute -top-8 right-0 w-56 h-56 rounded-full bg-accent/5 blur-3xl pointer-events-none" />
         <div className="relative z-10">
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-foreground glow-text">{greeting}</h1>
-          <p className="text-muted-foreground text-xs mt-0.5">Made for you</p>
+          <div className="flex items-center gap-2 mb-0.5">
+            <span className="text-2xl">{greetingEmoji}</span>
+            <h1 className="text-2xl sm:text-3xl font-extrabold text-foreground tracking-tight glow-text">{greeting}</h1>
+          </div>
+          <p className="text-muted-foreground text-xs mt-0.5 ml-10">
+            {isNewUser ? 'Discover your new favourite music' : 'Your personalised feed is ready'}
+          </p>
         </div>
       </motion.div>
 
-      {/* --- Continue Listening --- */}
+      {/* --- Continue Listening (registered users only) --- */}
       {user && (
         <Section title="Continue Listening" icon={Clock} delay={nextDelay()} showSeeAll>
           {loadingRecent ? <ContinueListeningSkeleton /> : <ContinueListening tracks={recentlyPlayed} />}
         </Section>
       )}
 
-      {/* --- Daily Mixes / Made For You --- */}
+      {/* --- TRENDING NOW — always shown, top of feed for new users --- */}
+      <Section title="Trending Now" icon={TrendingUp} delay={nextDelay()} showSeeAll emoji="🔥">
+        {loadingTrending ? <CarouselSkeleton /> : (
+          <HorizontalCarousel>
+            {trending?.map((track, i) => (
+              <TrackCard key={track.id} track={track} tracks={trending} index={i} />
+            ))}
+          </HorizontalCarousel>
+        )}
+      </Section>
+
+      {/* --- MOOD SECTIONS — time-aware, always populated --- */}
+      {moodSections && moodSections.length > 0 && moodSections.map((section, i) => (
+        <Section key={section.label} title={section.label} icon={Headphones} delay={nextDelay()} showSeeAll emoji={section.emoji}>
+          <HorizontalCarousel>
+            {section.tracks.map((track, j) => (
+              <TrackCard key={track.id} track={track} tracks={section.tracks} index={j} />
+            ))}
+          </HorizontalCarousel>
+        </Section>
+      ))}
+      {loadingMoods && <CarouselSkeleton />}
+
+      {/* --- FALLBACK SECTIONS — shown for new users without taste data --- */}
+      {isNewUser && !hasPersonalization && fallbackSections && fallbackSections.map((section, i) => (
+        <Section key={section.label} title={section.label} icon={Zap} delay={nextDelay()} showSeeAll emoji={section.emoji}>
+          <HorizontalCarousel>
+            {section.tracks.map((track, j) => (
+              <TrackCard key={track.id} track={track} tracks={section.tracks} index={j} />
+            ))}
+          </HorizontalCarousel>
+        </Section>
+      ))}
+      {isNewUser && loadingFallback && <><CarouselSkeleton /><CarouselSkeleton /></>}
+
+      {/* --- DAILY MIXES — Made For You (logged in) --- */}
       {user && dailyMixes && dailyMixes.length > 0 && (
-        <Section title="Made For You" icon={Sparkles} delay={nextDelay()} showSeeAll>
+        <Section title="Made For You" icon={Sparkles} delay={nextDelay()} showSeeAll emoji="✨">
           <HorizontalCarousel>
             {dailyMixes.map((mix, i) => (
               <div key={i} className="snap-start flex-shrink-0 w-[160px] sm:w-[180px]">
@@ -100,56 +180,32 @@ const Index = () => {
         </Section>
       )}
 
-      {/* --- Made For You (local recs) --- */}
-      {localRecs && localRecs.length > 0 && (
-        <>
-          {localRecs.map((row, i) => (
-            <Section key={row.reason} title={row.reason} icon={Sparkles} delay={nextDelay()} showSeeAll>
-              <HorizontalCarousel>
-                {row.tracks.map((track, j) => (
-                  <TrackCard key={track.id} track={track} tracks={row.tracks} index={j} />
-                ))}
-              </HorizontalCarousel>
-            </Section>
-          ))}
-        </>
+      {/* --- LOCAL PERSONALIZATION (taste profile driven) --- */}
+      {localRecs && localRecs.length > 0 && localRecs.map((row, i) => (
+        <Section key={row.reason} title={row.reason} icon={Sparkles} delay={nextDelay()} showSeeAll emoji="🎵">
+          <HorizontalCarousel>
+            {row.tracks.map((track, j) => (
+              <TrackCard key={track.id} track={track} tracks={row.tracks} index={j} />
+            ))}
+          </HorizontalCarousel>
+        </Section>
+      ))}
+
+      {/* --- AI RECOMMENDATIONS --- */}
+      {user && aiRecs && aiRecs.length > 0 && aiRecs.map((rec, i) =>
+        rec.tracks.length > 0 && (
+          <Section key={i} title={rec.reason} icon={Sparkles} delay={nextDelay()} showSeeAll emoji="🤖">
+            <HorizontalCarousel>
+              {rec.tracks.map((t: Track, j: number) => (
+                <TrackCard key={t.id} track={t} tracks={rec.tracks} index={j} />
+              ))}
+            </HorizontalCarousel>
+          </Section>
+        )
       )}
 
-      {/* --- AI Recommendations --- */}
-      {user && aiRecs && aiRecs.length > 0 && (
-        <>
-          {aiRecs.map((rec, i) =>
-            rec.tracks.length > 0 && (
-              <Section key={i} title={rec.reason} icon={Sparkles} delay={nextDelay()} showSeeAll>
-                <HorizontalCarousel>
-                  {rec.tracks.map((t: Track, j: number) => (
-                    <TrackCard key={t.id} track={t} tracks={rec.tracks} index={j} />
-                  ))}
-                </HorizontalCarousel>
-              </Section>
-            )
-          )}
-        </>
-      )}
-
-      {/* --- Mood Sections --- */}
-      {moodSections && moodSections.length > 0 && (
-        <>
-          {moodSections.map((section, i) => (
-            <Section key={section.label} title={`${section.emoji} ${section.label}`} icon={Headphones} delay={nextDelay()} showSeeAll>
-              <HorizontalCarousel>
-                {section.tracks.map((track, j) => (
-                  <TrackCard key={track.id} track={track} tracks={section.tracks} index={j} />
-                ))}
-              </HorizontalCarousel>
-            </Section>
-          ))}
-        </>
-      )}
-      {loadingMoods && <CarouselSkeleton />}
-
-
-      <Section title="Popular Artists" icon={Users} delay={nextDelay()} showSeeAll>
+      {/* --- POPULAR ARTISTS --- */}
+      <Section title="Popular Artists" icon={Users} delay={nextDelay()} showSeeAll emoji="🎤">
         {loadingArtists ? <ArtistCarouselSkeleton /> : (
           <HorizontalCarousel>
             {popularArtists?.map((artist, i) => (
@@ -159,19 +215,8 @@ const Index = () => {
         )}
       </Section>
 
-      {/* --- Trending Now --- */}
-      <Section title="Trending Now" icon={TrendingUp} delay={nextDelay()} showSeeAll>
-        {loadingTrending ? <CarouselSkeleton /> : (
-          <HorizontalCarousel>
-            {trending?.map((track, i) => (
-              <TrackCard key={track.id} track={track} tracks={trending} index={i} />
-            ))}
-          </HorizontalCarousel>
-        )}
-      </Section>
-
-      {/* --- New Releases --- */}
-      <Section title="New Releases" icon={Music2} delay={nextDelay()} showSeeAll>
+      {/* --- NEW RELEASES --- */}
+      <Section title="New Releases" icon={Music2} delay={nextDelay()} showSeeAll emoji="🆕">
         {loadingReleases ? <CarouselSkeleton /> : (
           <HorizontalCarousel>
             {newReleases?.map((track, i) => (

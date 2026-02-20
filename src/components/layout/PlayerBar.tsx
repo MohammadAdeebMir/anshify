@@ -78,6 +78,7 @@ export const PlayerBar = () => {
   const { isLiked, toggleLike } = useLikeTrack();
   const [expanded, setExpanded] = useState(false);
   const [queueOpen, setQueueOpen] = useState(false);
+  const [showHeartBurst, setShowHeartBurst] = useState(false);
   const lastTapRef = useRef(0);
   const navigate = useNavigate();
 
@@ -180,6 +181,20 @@ export const PlayerBar = () => {
                   style={{ backgroundImage: `url(${currentTrack.album_image})`, backgroundSize: 'cover', backgroundPosition: 'center' }}
                 />
               )}
+              {/* Heart burst animation */}
+              <AnimatePresence>
+                {showHeartBurst && (
+                  <motion.div
+                    initial={{ scale: 0, opacity: 1 }}
+                    animate={{ scale: 1.5, opacity: 0 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ duration: 0.7, ease: 'easeOut' }}
+                    className="absolute inset-0 flex items-center justify-center pointer-events-none z-20"
+                  >
+                    <Heart className="h-24 w-24 text-primary fill-current drop-shadow-2xl" />
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </motion.div>
           )}
 
@@ -194,7 +209,13 @@ export const PlayerBar = () => {
                 {user && (
                   <motion.button
                     whileTap={{ scale: 0.85 }}
-                    onClick={() => toggleLike.mutate({ track: currentTrack, liked })}
+                    onClick={() => {
+                      toggleLike.mutate({ track: currentTrack, liked });
+                      if (!liked) {
+                        setShowHeartBurst(true);
+                        setTimeout(() => setShowHeartBurst(false), 800);
+                      }
+                    }}
                     className={cn('p-2.5 rounded-full transition-all', liked ? 'text-primary' : 'text-foreground/40 hover:text-foreground')}
                   >
                     <Heart className={cn('h-5 w-5', liked && 'fill-current')} />

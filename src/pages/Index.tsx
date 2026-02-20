@@ -100,6 +100,10 @@ const Index = () => {
   const greeting = hours < 5 ? 'Good night' : hours < 12 ? 'Good morning' : hours < 18 ? 'Good afternoon' : 'Good evening';
   const greetingEmoji = hours < 5 ? '🌙' : hours < 12 ? '☀️' : hours < 18 ? '🌤️' : '🌆';
 
+  // Time-based section priority: night → mood first, morning → trending+focus first
+  const isNight = hours >= 21 || hours < 5;
+  const isMorning = hours >= 5 && hours < 12;
+
   let sectionDelay = 0;
   const nextDelay = () => { sectionDelay += 0.05; return sectionDelay; };
 
@@ -132,7 +136,13 @@ const Index = () => {
         </Section>
       )}
 
-      {/* --- TRENDING NOW — always shown, top of feed for new users --- */}
+      {/* ─── DYNAMIC SECTIONS ─── */}
+      {/* Order adapts: night → mood first, morning → trending first, afternoon/evening → mixed */}
+
+      {/* At night: moods come before trending */}
+      {isNight && <MoodBlock moodSections={moodSections} loadingMoods={loadingMoods} nextDelay={nextDelay} />}
+
+      {/* Trending */}
       <Section title="Trending Now" icon={TrendingUp} delay={nextDelay()} showSeeAll emoji="🔥">
         {loadingTrending ? <CarouselSkeleton /> : (
           <HorizontalCarousel>
@@ -143,20 +153,11 @@ const Index = () => {
         )}
       </Section>
 
-      {/* --- MOOD SECTIONS — time-aware, always populated --- */}
-      {moodSections && moodSections.length > 0 && moodSections.map((section, i) => (
-        <Section key={section.label} title={section.label} icon={Headphones} delay={nextDelay()} showSeeAll emoji={section.emoji}>
-          <HorizontalCarousel>
-            {section.tracks.map((track, j) => (
-              <TrackCard key={track.id} track={track} tracks={section.tracks} index={j} />
-            ))}
-          </HorizontalCarousel>
-        </Section>
-      ))}
-      {loadingMoods && <CarouselSkeleton />}
+      {/* Morning/Afternoon/Evening: moods after trending */}
+      {!isNight && <MoodBlock moodSections={moodSections} loadingMoods={loadingMoods} nextDelay={nextDelay} />}
 
-      {/* --- FALLBACK SECTIONS — shown for new users without taste data --- */}
-      {isNewUser && !hasPersonalization && fallbackSections && fallbackSections.map((section, i) => (
+      {/* Fallback sections for new users */}
+      {isNewUser && !hasPersonalization && fallbackSections && fallbackSections.map((section) => (
         <Section key={section.label} title={section.label} icon={Zap} delay={nextDelay()} showSeeAll emoji={section.emoji}>
           <HorizontalCarousel>
             {section.tracks.map((track, j) => (
@@ -167,7 +168,7 @@ const Index = () => {
       ))}
       {isNewUser && loadingFallback && <><CarouselSkeleton /><CarouselSkeleton /></>}
 
-      {/* --- DAILY MIXES — Made For You (logged in) --- */}
+      {/* Made For You */}
       {user && dailyMixes && dailyMixes.length > 0 && (
         <Section title="Made For You" icon={Sparkles} delay={nextDelay()} showSeeAll emoji="✨">
           <HorizontalCarousel>
@@ -180,8 +181,8 @@ const Index = () => {
         </Section>
       )}
 
-      {/* --- LOCAL PERSONALIZATION (taste profile driven) --- */}
-      {localRecs && localRecs.length > 0 && localRecs.map((row, i) => (
+      {/* Local personalization */}
+      {localRecs && localRecs.length > 0 && localRecs.map((row) => (
         <Section key={row.reason} title={row.reason} icon={Sparkles} delay={nextDelay()} showSeeAll emoji="🎵">
           <HorizontalCarousel>
             {row.tracks.map((track, j) => (
@@ -191,7 +192,7 @@ const Index = () => {
         </Section>
       ))}
 
-      {/* --- AI RECOMMENDATIONS --- */}
+      {/* AI recommendations */}
       {user && aiRecs && aiRecs.length > 0 && aiRecs.map((rec, i) =>
         rec.tracks.length > 0 && (
           <Section key={i} title={rec.reason} icon={Sparkles} delay={nextDelay()} showSeeAll emoji="🤖">
@@ -204,7 +205,7 @@ const Index = () => {
         )
       )}
 
-      {/* --- POPULAR ARTISTS --- */}
+      {/* Popular artists — shown earlier at night for discovery */}
       <Section title="Popular Artists" icon={Users} delay={nextDelay()} showSeeAll emoji="🎤">
         {loadingArtists ? <ArtistCarouselSkeleton /> : (
           <HorizontalCarousel>
@@ -215,7 +216,7 @@ const Index = () => {
         )}
       </Section>
 
-      {/* --- NEW RELEASES --- */}
+      {/* New releases */}
       <Section title="New Releases" icon={Music2} delay={nextDelay()} showSeeAll emoji="🆕">
         {loadingReleases ? <CarouselSkeleton /> : (
           <HorizontalCarousel>
@@ -228,5 +229,25 @@ const Index = () => {
     </div>
   );
 };
+
+// Extracted mood block for reuse in dynamic ordering
+const MoodBlock = ({ moodSections, loadingMoods, nextDelay }: {
+  moodSections: { label: string; emoji: string; tracks: Track[] }[] | undefined;
+  loadingMoods: boolean;
+  nextDelay: () => number;
+}) => (
+  <>
+    {moodSections && moodSections.length > 0 && moodSections.map((section) => (
+      <Section key={section.label} title={section.label} icon={Headphones} delay={nextDelay()} showSeeAll emoji={section.emoji}>
+        <HorizontalCarousel>
+          {section.tracks.map((track, j) => (
+            <TrackCard key={track.id} track={track} tracks={section.tracks} index={j} />
+          ))}
+        </HorizontalCarousel>
+      </Section>
+    ))}
+    {loadingMoods && <CarouselSkeleton />}
+  </>
+);
 
 export default Index;

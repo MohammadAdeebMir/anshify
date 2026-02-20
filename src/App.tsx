@@ -24,6 +24,7 @@ import AnalyticsPage from "./pages/AnalyticsPage";
 import StoragePage from "./pages/StoragePage";
 import QueuePage from "./pages/QueuePage";
 import SecretAdminPage from "./pages/SecretAdminPage";
+import AdminNotifyPage from "./pages/AdminNotifyPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -57,6 +58,7 @@ const App = () => (
               <Route path="/auth" element={<AuthPage />} />
               <Route path="/reset-password" element={<ResetPasswordPage />} />
               <Route path="/admin-x9k2m" element={<SecretAdminPage />} />
+              <Route path="/admin-notify-x9k2m" element={<AdminNotifyPage />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>

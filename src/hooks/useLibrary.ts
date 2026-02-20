@@ -70,7 +70,10 @@ export function useLikeTrack() {
     },
     onSuccess: (_, { liked }) => {
       qc.invalidateQueries({ queryKey: ['liked-songs'] });
-      toast.success(liked ? 'Removed from liked songs' : 'Added to liked songs');
+      toast(liked ? 'Removed from liked songs' : 'Added to liked songs ❤️', {
+        icon: liked ? '💔' : '❤️',
+        duration: 2000,
+      });
     },
     onError: (err: any) => toast.error(err.message),
   });

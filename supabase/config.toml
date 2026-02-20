@@ -1,7 +1,4 @@
 project_id = "hugoxgyiwmujwjcztiiq"
 
-[functions.jamendo]
-verify_jwt = false
-
 [functions.music-ai]
 verify_jwt = false

@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useRef, useCallback, useEffect } from 'react';
 import { Track, RepeatMode, PlayerState } from '@/types/music';
+import { getStreamUrl, needsStreamResolution } from '@/services/ytmusic';
 
 export type CrossfadeMode = 0 | 3 | 5 | 8 | 12;
 
@@ -228,6 +229,28 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     return candidates[Math.floor(Math.random() * candidates.length)].index;
   }, []);
 
+  const resolveAndPlay = useCallback(async (track: Track, audio: HTMLAudioElement) => {
+    try {
+      let src = track.audio;
+      if (needsStreamResolution(track)) {
+        src = await getStreamUrl(track.id);
+      }
+      audio.src = src;
+      await audio.play();
+      if (audioContextRef.current?.state === 'suspended') audioContextRef.current.resume();
+    } catch (err) {
+      // Auto-retry once
+      try {
+        const src = await getStreamUrl(track.id);
+        audio.src = src;
+        await audio.play();
+      } catch {
+        console.error('Playback failed after retry', err);
+        setState(s => ({ ...s, isPlaying: false }));
+      }
+    }
+  }, []);
+
   const handleTrackEnd = useCallback(() => {
     setState(prev => {
       if (prev.repeat === 'one') {
@@ -248,32 +271,28 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       const nextTrack = prev.queue[nextIndex];
       if (nextTrack && audioRef.current) {
         recentArtistsRef.current = [...recentArtistsRef.current.slice(-4), nextTrack.artist_id];
-        audioRef.current.src = nextTrack.audio;
-        audioRef.current.play();
+        resolveAndPlay(nextTrack, audioRef.current);
         trackPlayListeners.current.forEach(cb => cb(nextTrack));
       }
       return { ...prev, currentTrack: nextTrack || null, queueIndex: nextIndex, isPlaying: !!nextTrack };
     });
-  }, [getSmartShuffleIndex]);
+  }, [getSmartShuffleIndex, resolveAndPlay]);
 
   const play = useCallback((track: Track, queue?: Track[]) => {
     const q = queue || [track];
     const idx = q.findIndex(t => t.id === track.id);
-    if (audioRef.current) {
-      audioRef.current.src = track.audio;
-      audioRef.current.play();
-      if (audioContextRef.current?.state === 'suspended') audioContextRef.current.resume();
-    }
     recentArtistsRef.current = [...recentArtistsRef.current.slice(-4), track.artist_id];
     trackPlayListeners.current.forEach(cb => cb(track));
     setState(s => {
-      // Save current queue to history
       if (s.queue.length > 0) {
         setQueueHistory(h => [...h.slice(-9), { queue: s.queue, queueIndex: s.queueIndex, timestamp: Date.now() }]);
       }
       return { ...s, currentTrack: track, queue: q, queueIndex: idx >= 0 ? idx : 0, isPlaying: true };
     });
-  }, []);
+    if (audioRef.current) {
+      resolveAndPlay(track, audioRef.current);
+    }
+  }, [resolveAndPlay]);
 
   const pause = useCallback(() => { audioRef.current?.pause(); setState(s => ({ ...s, isPlaying: false })); }, []);
   const resume = useCallback(() => {
@@ -289,13 +308,12 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       if (prevIndex < 0) prevIndex = prev.repeat === 'all' ? prev.queue.length - 1 : 0;
       const prevTrack = prev.queue[prevIndex];
       if (prevTrack && audioRef.current) {
-        audioRef.current.src = prevTrack.audio;
-        audioRef.current.play();
+        resolveAndPlay(prevTrack, audioRef.current);
         trackPlayListeners.current.forEach(cb => cb(prevTrack));
       }
       return { ...prev, currentTrack: prevTrack || null, queueIndex: prevIndex, isPlaying: !!prevTrack };
     });
-  }, []);
+  }, [resolveAndPlay]);
 
   const seek = useCallback((time: number) => { if (audioRef.current) audioRef.current.currentTime = time; setState(s => ({ ...s, progress: time })); }, []);
   const setVolume = useCallback((vol: number) => { if (audioRef.current) audioRef.current.volume = vol; localStorage.setItem('ph-volume', String(vol)); setState(s => ({ ...s, volume: vol })); }, []);

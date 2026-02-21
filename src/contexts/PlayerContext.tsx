@@ -239,6 +239,11 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       if (needsStreamResolution(track)) {
         src = await getStreamUrl(track.id);
       }
+      if (!src || src.includes('youtube.com/watch')) {
+        console.error('Invalid stream URL received:', src);
+        setState(s => ({ ...s, isPlaying: false }));
+        return;
+      }
       audio.src = src;
       await audio.play();
       if (audioContextRef.current?.state === 'suspended') audioContextRef.current.resume();
@@ -246,10 +251,15 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       // Auto-retry once
       try {
         const src = await getStreamUrl(track.id);
+        if (!src || src.includes('youtube.com/watch')) {
+          console.error('Invalid stream URL on retry:', src);
+          setState(s => ({ ...s, isPlaying: false }));
+          return;
+        }
         audio.src = src;
         await audio.play();
-      } catch {
-        console.error('Playback failed after retry', err);
+      } catch (retryErr) {
+        console.error('Playback failed after retry', retryErr);
         setState(s => ({ ...s, isPlaying: false }));
       }
     }

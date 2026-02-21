@@ -95,7 +95,12 @@ export async function getStreamUrl(videoId: string): Promise<string> {
 
   const data = await res.json();
   const url = data.audio_url || data.url || data.stream_url || '';
-  if (!url) throw new Error('No audio URL in stream response');
+  
+  // Validate we got an actual stream URL, not a watch page
+  if (!url || url.includes('youtube.com/watch') || url.includes('youtu.be/')) {
+    console.error('Backend returned non-streamable URL:', url);
+    throw new Error('Backend returned a YouTube watch URL instead of a direct audio stream. The stream backend needs to be fixed to return a direct audio URL.');
+  }
 
   streamCache.set(videoId, { url, timestamp: Date.now() });
   trimCache(streamCache, 50);

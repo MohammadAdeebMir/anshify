@@ -2,7 +2,7 @@ import { usePlayer } from '@/contexts/PlayerContext';
 import {
   Play, Pause, SkipBack, SkipForward, Volume2, VolumeX,
   Shuffle, Repeat, Repeat1, Timer, ChevronDown, Heart,
-  ListMusic, Waves, Activity, Loader2
+  ListMusic, Waves, Activity, Loader2, RotateCcw
 } from 'lucide-react';
 import { Slider } from '@/components/ui/slider';
 import { cn } from '@/lib/utils';
@@ -23,7 +23,6 @@ const formatTime = (s: number) => {
   return `${m}:${sec.toString().padStart(2, '0')}`;
 };
 
-// ─── Icon button atoms ────────────────────────────────────────────────────────
 const IconBtn = ({
   onClick, active = false, className = '', children
 }: { onClick: () => void; active?: boolean; className?: string; children: React.ReactNode }) => (
@@ -39,19 +38,27 @@ const IconBtn = ({
   </button>
 );
 
-// ─── Smooth progress bar ──────────────────────────────────────────────────────
 const ProgressBar = ({
-  progress, duration, onSeek, compact = false
-}: { progress: number; duration: number; onSeek: (v: number) => void; compact?: boolean }) => {
+  progress, duration, onSeek, compact = false, isBuffering = false
+}: { progress: number; duration: number; onSeek: (v: number) => void; compact?: boolean; isBuffering?: boolean }) => {
   const percent = duration > 0 ? (progress / duration) * 100 : 0;
   if (compact) {
     return (
       <div className="w-full h-[3px] rounded-full bg-foreground/10 overflow-hidden">
-        <motion.div
-          className="h-full bg-foreground rounded-full"
-          style={{ width: `${percent}%` }}
-          transition={{ duration: 0.2, ease: 'linear' }}
-        />
+        {isBuffering ? (
+          <motion.div
+            className="h-full bg-foreground/40 rounded-full"
+            animate={{ x: ['-100%', '100%'] }}
+            transition={{ repeat: Infinity, duration: 1.2, ease: 'easeInOut' }}
+            style={{ width: '40%' }}
+          />
+        ) : (
+          <motion.div
+            className="h-full bg-foreground rounded-full"
+            style={{ width: `${percent}%` }}
+            transition={{ duration: 0.2, ease: 'linear' }}
+          />
+        )}
       </div>
     );
   }
@@ -70,6 +77,54 @@ const ProgressBar = ({
   );
 };
 
+// Play/Pause button that shows buffering state
+const PlayPauseBtn = ({ size = 'md', isPlaying, isBuffering, playbackError, onPlay, onPause, onRetry }: {
+  size?: 'sm' | 'md' | 'lg';
+  isPlaying: boolean;
+  isBuffering: boolean;
+  playbackError: string | null;
+  onPlay: () => void;
+  onPause: () => void;
+  onRetry: () => void;
+}) => {
+  const dims = size === 'lg' ? 'h-16 w-16' : size === 'md' ? 'h-9 w-9' : 'h-9 w-9';
+  const iconDims = size === 'lg' ? 'h-7 w-7' : 'h-[15px] w-[15px]';
+
+  if (playbackError) {
+    return (
+      <motion.button
+        whileTap={{ scale: 0.88 }}
+        onClick={onRetry}
+        className={cn(dims, 'rounded-full bg-destructive/80 flex items-center justify-center shadow-2xl')}
+        title={playbackError}
+      >
+        <RotateCcw className={cn(iconDims, 'text-white')} />
+      </motion.button>
+    );
+  }
+
+  if (isBuffering) {
+    return (
+      <div className={cn(dims, 'rounded-full bg-foreground flex items-center justify-center shadow-2xl')}>
+        <Loader2 className={cn(iconDims, 'text-background animate-spin')} />
+      </div>
+    );
+  }
+
+  return (
+    <motion.button
+      whileTap={{ scale: 0.88 }}
+      onClick={isPlaying ? onPause : onPlay}
+      className={cn(dims, 'rounded-full bg-foreground flex items-center justify-center shadow-2xl')}
+    >
+      {isPlaying
+        ? <Pause className={cn(iconDims, 'text-background fill-current')} />
+        : <Play className={cn(iconDims, 'text-background fill-current ml-0.5')} />
+      }
+    </motion.button>
+  );
+};
+
 export const PlayerBar = () => {
   const player = usePlayer();
   const isMobile = useIsMobile();
@@ -84,7 +139,7 @@ export const PlayerBar = () => {
 
   if (!player.currentTrack) return null;
 
-  const { currentTrack, isPlaying, progress, duration, volume, shuffle, repeat, sleepTimer, queue, queueIndex, visualizerEnabled, workoutMode } = player;
+  const { currentTrack, isPlaying, progress, duration, volume, shuffle, repeat, sleepTimer, queue, queueIndex, visualizerEnabled, workoutMode, isBuffering, playbackError } = player;
   const liked = isLiked(currentTrack.id, likedSongs);
   const upcomingCount = queue.length - queueIndex - 1;
 
@@ -114,14 +169,11 @@ export const PlayerBar = () => {
         exit={{ y: '100%' }}
         transition={{ type: 'spring', damping: 30, stiffness: 300 }}
         className="fixed inset-0 z-50 flex flex-col pb-[env(safe-area-inset-bottom)]"
-        style={{ background: 'hsl(0 0% 0%)' }}
+        style={{ background: 'linear-gradient(180deg, hsl(0 0% 6%) 0%, hsl(0 0% 0%) 100%)' }}
       >
         {/* Top bar */}
         <div className="flex items-center justify-between px-5 pt-4 pb-2">
-          <button
-            onClick={() => setExpanded(false)}
-            className="p-2 rounded-full text-foreground/50 hover:text-foreground hover:bg-foreground/8 transition-all"
-          >
+          <button onClick={() => setExpanded(false)} className="p-2 rounded-full text-foreground/50 hover:text-foreground hover:bg-foreground/8 transition-all">
             <ChevronDown className="h-6 w-6" />
           </button>
           <div className="text-center">
@@ -129,10 +181,7 @@ export const PlayerBar = () => {
           </div>
           <div className="flex items-center gap-0.5">
             <SleepTimerPopover />
-            <button
-              onClick={() => { setExpanded(false); navigate('/queue'); }}
-              className="p-2 text-foreground/50 hover:text-foreground transition-colors relative"
-            >
+            <button onClick={() => { setExpanded(false); navigate('/queue'); }} className="p-2 text-foreground/50 hover:text-foreground transition-colors relative">
               <ListMusic className="h-5 w-5" />
               {upcomingCount > 0 && (
                 <span className="absolute -top-0.5 -right-0.5 h-4 w-4 rounded-full bg-primary text-[9px] font-bold text-primary-foreground flex items-center justify-center">
@@ -146,28 +195,20 @@ export const PlayerBar = () => {
         {/* Album art */}
         <motion.div
           className="flex-1 flex flex-col items-center justify-center px-8 gap-7"
-          drag="x"
-          dragConstraints={{ left: 0, right: 0 }}
-          dragElastic={0.25}
-          onDragEnd={handleSwipe}
-          onTap={handleDoubleTap}
+          drag="x" dragConstraints={{ left: 0, right: 0 }} dragElastic={0.25}
+          onDragEnd={handleSwipe} onTap={handleDoubleTap}
         >
           {visualizerEnabled ? (
             <MusicVisualizer className="w-72 h-72 rounded-3xl overflow-hidden" />
           ) : (
             <motion.div
-              animate={isPlaying ? { scale: [1, 1.018, 1] } : { scale: 0.95 }}
+              animate={isPlaying && !isBuffering ? { scale: [1, 1.018, 1] } : { scale: 0.95 }}
               transition={{ repeat: Infinity, duration: 4, ease: 'easeInOut' }}
               className="relative w-72 h-72"
             >
               <div className="w-full h-full rounded-3xl overflow-hidden shadow-2xl">
                 {currentTrack.album_image ? (
-                  <img
-                    src={currentTrack.album_image}
-                    alt={currentTrack.album_name}
-                    className="h-full w-full object-cover"
-                    decoding="async"
-                  />
+                  <img src={currentTrack.album_image} alt={currentTrack.album_name} className="h-full w-full object-cover" decoding="async" />
                 ) : (
                   <div className="h-full w-full bg-foreground/5 flex items-center justify-center">
                     <Play className="h-12 w-12 text-foreground/20" />
@@ -176,21 +217,20 @@ export const PlayerBar = () => {
               </div>
               {/* Ambient art glow */}
               {isPlaying && currentTrack.album_image && (
-                <div
-                  className="absolute -inset-10 -z-10 rounded-[3rem] opacity-25 blur-3xl"
+                <div className="absolute -inset-10 -z-10 rounded-[3rem] opacity-20 blur-3xl"
                   style={{ backgroundImage: `url(${currentTrack.album_image})`, backgroundSize: 'cover', backgroundPosition: 'center' }}
                 />
               )}
-              {/* Heart burst animation */}
+              {/* Buffering overlay */}
+              {isBuffering && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-3xl">
+                  <Loader2 className="h-10 w-10 text-white animate-spin" />
+                </div>
+              )}
               <AnimatePresence>
                 {showHeartBurst && (
-                  <motion.div
-                    initial={{ scale: 0, opacity: 1 }}
-                    animate={{ scale: 1.5, opacity: 0 }}
-                    exit={{ opacity: 0 }}
-                    transition={{ duration: 0.7, ease: 'easeOut' }}
-                    className="absolute inset-0 flex items-center justify-center pointer-events-none z-20"
-                  >
+                  <motion.div initial={{ scale: 0, opacity: 1 }} animate={{ scale: 1.5, opacity: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.7, ease: 'easeOut' }}
+                    className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
                     <Heart className="h-24 w-24 text-primary fill-current drop-shadow-2xl" />
                   </motion.div>
                 )}
@@ -207,43 +247,29 @@ export const PlayerBar = () => {
               </div>
               <div className="flex items-center gap-1 ml-3 flex-shrink-0">
                 {user && (
-                  <motion.button
-                    whileTap={{ scale: 0.85 }}
-                    onClick={() => {
-                      toggleLike.mutate({ track: currentTrack, liked });
-                      if (!liked) {
-                        setShowHeartBurst(true);
-                        setTimeout(() => setShowHeartBurst(false), 800);
-                      }
-                    }}
-                    className={cn('p-2.5 rounded-full transition-all', liked ? 'text-primary' : 'text-foreground/40 hover:text-foreground')}
-                  >
+                  <motion.button whileTap={{ scale: 0.85 }}
+                    onClick={() => { toggleLike.mutate({ track: currentTrack, liked }); if (!liked) { setShowHeartBurst(true); setTimeout(() => setShowHeartBurst(false), 800); } }}
+                    className={cn('p-2.5 rounded-full transition-all', liked ? 'text-primary' : 'text-foreground/40 hover:text-foreground')}>
                     <Heart className={cn('h-5 w-5', liked && 'fill-current')} />
                   </motion.button>
                 )}
               </div>
             </div>
 
-            {/* Extra controls row */}
+            {/* Error message */}
+            {playbackError && (
+              <p className="text-xs text-destructive text-center">{playbackError}</p>
+            )}
+
             <div className="flex items-center gap-2">
-              <button
-                onClick={() => player.setVisualizerEnabled(!visualizerEnabled)}
+              <button onClick={() => player.setVisualizerEnabled(!visualizerEnabled)}
                 className={cn('flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-medium transition-all border',
-                  visualizerEnabled
-                    ? 'bg-primary/15 border-primary/30 text-primary'
-                    : 'border-foreground/10 text-foreground/40 hover:text-foreground hover:border-foreground/20'
-                )}
-              >
+                  visualizerEnabled ? 'bg-primary/15 border-primary/30 text-primary' : 'border-foreground/10 text-foreground/40 hover:text-foreground hover:border-foreground/20')}>
                 <Waves className="h-3.5 w-3.5" />Visualizer
               </button>
-              <button
-                onClick={() => player.setWorkoutMode(!workoutMode)}
+              <button onClick={() => player.setWorkoutMode(!workoutMode)}
                 className={cn('flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-medium transition-all border',
-                  workoutMode
-                    ? 'bg-primary/15 border-primary/30 text-primary'
-                    : 'border-foreground/10 text-foreground/40 hover:text-foreground hover:border-foreground/20'
-                )}
-              >
+                  workoutMode ? 'bg-primary/15 border-primary/30 text-primary' : 'border-foreground/10 text-foreground/40 hover:text-foreground hover:border-foreground/20')}>
                 <Activity className="h-3.5 w-3.5" />Workout
               </button>
             </div>
@@ -261,25 +287,10 @@ export const PlayerBar = () => {
 
         {/* Main controls */}
         <div className="flex items-center justify-between px-8 py-5">
-          <IconBtn onClick={player.toggleShuffle} active={shuffle}>
-            <Shuffle className="h-5 w-5" />
-          </IconBtn>
-          <IconBtn onClick={player.previous} className="p-2">
-            <SkipBack className="h-7 w-7 fill-current" />
-          </IconBtn>
-          <motion.button
-            whileTap={{ scale: 0.88 }}
-            onClick={isPlaying ? player.pause : player.resume}
-            className="h-16 w-16 rounded-full bg-foreground flex items-center justify-center shadow-2xl"
-          >
-            {isPlaying
-              ? <Pause className="h-7 w-7 text-background fill-current" />
-              : <Play className="h-7 w-7 text-background fill-current ml-0.5" />
-            }
-          </motion.button>
-          <IconBtn onClick={player.next} className="p-2">
-            <SkipForward className="h-7 w-7 fill-current" />
-          </IconBtn>
+          <IconBtn onClick={player.toggleShuffle} active={shuffle}><Shuffle className="h-5 w-5" /></IconBtn>
+          <IconBtn onClick={player.previous} className="p-2"><SkipBack className="h-7 w-7 fill-current" /></IconBtn>
+          <PlayPauseBtn size="lg" isPlaying={isPlaying} isBuffering={isBuffering} playbackError={playbackError} onPlay={player.resume} onPause={player.pause} onRetry={player.retryPlayback} />
+          <IconBtn onClick={player.next} className="p-2"><SkipForward className="h-7 w-7 fill-current" /></IconBtn>
           <IconBtn onClick={player.toggleRepeat} active={repeat !== 'off'}>
             {repeat === 'one' ? <Repeat1 className="h-5 w-5" /> : <Repeat className="h-5 w-5" />}
           </IconBtn>
@@ -294,16 +305,14 @@ export const PlayerBar = () => {
 
         {sleepTimer !== null && (
           <div className="text-center pb-4">
-            <span className="text-xs text-primary flex items-center justify-center gap-1">
-              <Timer className="h-3 w-3" /> Sleep in {sleepTimer}m
-            </span>
+            <span className="text-xs text-primary flex items-center justify-center gap-1"><Timer className="h-3 w-3" /> Sleep in {sleepTimer}m</span>
           </div>
         )}
       </motion.div>
     );
   }
 
-  // ─── MINI PLAYER (mobile + desktop) ────────────────────────────────────────
+  // ─── MINI PLAYER ────────────────────────────────────────────────────────────
   return (
     <>
       <QueuePanel open={queueOpen} onClose={() => setQueueOpen(false)} />
@@ -315,49 +324,30 @@ export const PlayerBar = () => {
           transition={{ type: 'spring', damping: 28, stiffness: 260 }}
           className={cn('fixed left-0 right-0 z-30', isMobile ? 'bottom-14' : 'bottom-0')}
         >
-          {/* OLED Glass surface */}
-          <div
-            className="absolute inset-0"
+          <div className="absolute inset-0"
             style={{
-              background: 'hsl(0 0% 3% / 0.96)',
-              backdropFilter: 'blur(40px)',
-              WebkitBackdropFilter: 'blur(40px)',
-              borderTop: '1px solid hsl(0 0% 15% / 0.5)',
+              background: 'linear-gradient(180deg, hsl(0 0% 5% / 0.97) 0%, hsl(0 0% 2% / 0.99) 100%)',
+              backdropFilter: 'blur(40px)', WebkitBackdropFilter: 'blur(40px)',
+              borderTop: '1px solid hsl(0 0% 15% / 0.4)',
             }}
           />
 
-          {/* Progress strip at top — always visible on mobile */}
           {isMobile && (
             <div className="relative px-3 pt-2 z-10">
-              <ProgressBar progress={progress} duration={duration} onSeek={player.seek} compact />
+              <ProgressBar progress={progress} duration={duration} onSeek={player.seek} compact isBuffering={isBuffering} />
             </div>
           )}
 
           <motion.div
             className={cn('flex items-center gap-3 px-3 sm:px-5 relative z-10', isMobile ? 'h-[60px]' : 'h-[70px]')}
-            drag={isMobile ? 'x' : false}
-            dragConstraints={{ left: 0, right: 0 }}
-            dragElastic={0.25}
-            onDragEnd={handleSwipe}
+            drag={isMobile ? 'x' : false} dragConstraints={{ left: 0, right: 0 }} dragElastic={0.25} onDragEnd={handleSwipe}
           >
-            {/* Artwork + track info */}
-            <button
-              onClick={() => isMobile && setExpanded(true)}
-              className="flex items-center gap-3 flex-1 min-w-0 text-left"
-            >
+            <button onClick={() => isMobile && setExpanded(true)} className="flex items-center gap-3 flex-1 min-w-0 text-left">
               <div className={cn('rounded-xl overflow-hidden flex-shrink-0 shadow-xl', isMobile ? 'h-10 w-10' : 'h-12 w-12')}>
                 {currentTrack.album_image ? (
-                  <img
-                    src={currentTrack.album_image}
-                    alt={currentTrack.album_name}
-                    className="h-full w-full object-cover"
-                    loading="lazy"
-                    decoding="async"
-                  />
+                  <img src={currentTrack.album_image} alt={currentTrack.album_name} className="h-full w-full object-cover" loading="lazy" decoding="async" />
                 ) : (
-                  <div className="h-full w-full bg-foreground/8 flex items-center justify-center">
-                    <Play className="h-4 w-4 text-foreground/30" />
-                  </div>
+                  <div className="h-full w-full bg-foreground/8 flex items-center justify-center"><Play className="h-4 w-4 text-foreground/30" /></div>
                 )}
               </div>
               <div className="min-w-0">
@@ -366,71 +356,37 @@ export const PlayerBar = () => {
               </div>
             </button>
 
-            {/* Like button — desktop only */}
             {!isMobile && user && (
-              <motion.button
-                whileTap={{ scale: 0.85 }}
-                onClick={() => toggleLike.mutate({ track: currentTrack, liked })}
-                className={cn('p-1.5 rounded-full transition-all', liked ? 'text-primary' : 'text-foreground/35 hover:text-foreground')}
-              >
+              <motion.button whileTap={{ scale: 0.85 }} onClick={() => toggleLike.mutate({ track: currentTrack, liked })}
+                className={cn('p-1.5 rounded-full transition-all', liked ? 'text-primary' : 'text-foreground/35 hover:text-foreground')}>
                 <Heart className={cn('h-4 w-4', liked && 'fill-current')} />
               </motion.button>
             )}
 
-            {/* Controls */}
             <div className={cn('flex flex-col items-center', isMobile ? 'gap-0' : 'gap-1 flex-1')}>
               <div className="flex items-center gap-2">
-                {!isMobile && (
-                  <IconBtn onClick={player.toggleShuffle} active={shuffle} className="p-1.5">
-                    <Shuffle className="h-4 w-4" />
-                  </IconBtn>
-                )}
-                <IconBtn onClick={player.previous} className="p-1.5">
-                  <SkipBack className="h-[18px] w-[18px] fill-current text-foreground/70 hover:text-foreground" />
-                </IconBtn>
-                <motion.button
-                  whileTap={{ scale: 0.88 }}
-                  onClick={isPlaying ? player.pause : player.resume}
-                  className="h-9 w-9 rounded-full bg-foreground flex items-center justify-center shadow-lg"
-                >
-                  {isPlaying
-                    ? <Pause className="h-[15px] w-[15px] text-background fill-current" />
-                    : <Play className="h-[15px] w-[15px] text-background fill-current ml-0.5" />
-                  }
-                </motion.button>
-                <IconBtn onClick={player.next} className="p-1.5">
-                  <SkipForward className="h-[18px] w-[18px] fill-current text-foreground/70 hover:text-foreground" />
-                </IconBtn>
-                {!isMobile && (
-                  <IconBtn onClick={player.toggleRepeat} active={repeat !== 'off'} className="p-1.5">
-                    {repeat === 'one' ? <Repeat1 className="h-4 w-4" /> : <Repeat className="h-4 w-4" />}
-                  </IconBtn>
-                )}
+                {!isMobile && <IconBtn onClick={player.toggleShuffle} active={shuffle} className="p-1.5"><Shuffle className="h-4 w-4" /></IconBtn>}
+                <IconBtn onClick={player.previous} className="p-1.5"><SkipBack className="h-[18px] w-[18px] fill-current text-foreground/70 hover:text-foreground" /></IconBtn>
+                <PlayPauseBtn size="sm" isPlaying={isPlaying} isBuffering={isBuffering} playbackError={playbackError} onPlay={player.resume} onPause={player.pause} onRetry={player.retryPlayback} />
+                <IconBtn onClick={player.next} className="p-1.5"><SkipForward className="h-[18px] w-[18px] fill-current text-foreground/70 hover:text-foreground" /></IconBtn>
+                {!isMobile && <IconBtn onClick={player.toggleRepeat} active={repeat !== 'off'} className="p-1.5">
+                  {repeat === 'one' ? <Repeat1 className="h-4 w-4" /> : <Repeat className="h-4 w-4" />}
+                </IconBtn>}
               </div>
-
-              {/* Desktop seek */}
               {!isMobile && (
                 <div className="w-full max-w-sm">
-                  <ProgressBar progress={progress} duration={duration} onSeek={player.seek} />
+                  <ProgressBar progress={progress} duration={duration} onSeek={player.seek} isBuffering={isBuffering} />
                 </div>
               )}
             </div>
 
-            {/* Right side — desktop */}
             {!isMobile && (
               <div className="flex items-center gap-1 flex-1 justify-end">
                 {sleepTimer !== null && (
-                  <span className="text-[10px] text-primary flex items-center gap-0.5 mr-1">
-                    <Timer className="h-3 w-3" />{sleepTimer}m
-                  </span>
+                  <span className="text-[10px] text-primary flex items-center gap-0.5 mr-1"><Timer className="h-3 w-3" />{sleepTimer}m</span>
                 )}
-                <IconBtn onClick={() => player.setVisualizerEnabled(!visualizerEnabled)} active={visualizerEnabled} className="p-1.5">
-                  <Waves className="h-4 w-4" />
-                </IconBtn>
-                <button
-                  onClick={() => setQueueOpen(o => !o)}
-                  className="p-1.5 text-foreground/40 hover:text-foreground transition-colors relative"
-                >
+                <IconBtn onClick={() => player.setVisualizerEnabled(!visualizerEnabled)} active={visualizerEnabled} className="p-1.5"><Waves className="h-4 w-4" /></IconBtn>
+                <button onClick={() => setQueueOpen(o => !o)} className="p-1.5 text-foreground/40 hover:text-foreground transition-colors relative">
                   <ListMusic className="h-4 w-4" />
                   {upcomingCount > 0 && (
                     <span className="absolute -top-0.5 -right-0.5 h-3.5 w-3.5 rounded-full bg-primary text-[8px] font-bold text-primary-foreground flex items-center justify-center">
@@ -439,10 +395,7 @@ export const PlayerBar = () => {
                   )}
                 </button>
                 <SleepTimerPopover />
-                <button
-                  onClick={() => player.setVolume(volume === 0 ? 0.7 : 0)}
-                  className="p-1.5 text-foreground/40 hover:text-foreground transition-colors"
-                >
+                <button onClick={() => player.setVolume(volume === 0 ? 0.7 : 0)} className="p-1.5 text-foreground/40 hover:text-foreground transition-colors">
                   {volume === 0 ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
                 </button>
                 <Slider value={[volume]} max={1} step={0.01} onValueChange={([v]) => player.setVolume(v)} className="w-20" />

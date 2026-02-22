@@ -34,15 +34,16 @@ interface PlayerContextType extends PlayerState {
   sleepTimerEnd: number | null;
   volumeNormalization: boolean;
   setVolumeNormalization: (v: boolean) => void;
-  // Visualizer
   analyserNode: AnalyserNode | null;
   visualizerEnabled: boolean;
   setVisualizerEnabled: (v: boolean) => void;
-  // Workout
   workoutMode: boolean;
   setWorkoutMode: (v: boolean) => void;
   targetBPM: number;
   setTargetBPM: (bpm: number) => void;
+  isBuffering: boolean;
+  playbackError: string | null;
+  retryPlayback: () => void;
 }
 
 const PlayerContext = createContext<PlayerContextType | null>(null);
@@ -53,7 +54,6 @@ export const usePlayer = () => {
   return ctx;
 };
 
-// Persist queue to localStorage
 const QUEUE_KEY = 'ph-queue';
 const QUEUE_INDEX_KEY = 'ph-queue-index';
 const QUEUE_TRACK_KEY = 'ph-queue-track';
@@ -84,6 +84,10 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const sourceRef = useRef<MediaElementAudioSourceNode | null>(null);
+  const bufferTimeoutRef = useRef<number | null>(null);
+
+  const [isBuffering, setIsBuffering] = useState(false);
+  const [playbackError, setPlaybackError] = useState<string | null>(null);
 
   const [crossfadeDuration, setCrossfadeDurationState] = useState<CrossfadeMode>(
     () => (parseInt(localStorage.getItem('ph-crossfade') || '0') || 0) as CrossfadeMode
@@ -114,7 +118,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const recentArtistsRef = useRef<string[]>([]);
 
-  // Setup audio + analyser
+  // Setup audio
   useEffect(() => {
     const audio = new Audio();
     audio.volume = state.volume;
@@ -126,15 +130,34 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const onTimeUpdate = () => setState(s => ({ ...s, progress: audio.currentTime }));
     const onLoadedMeta = () => setState(s => ({ ...s, duration: audio.duration }));
     const onEnded = () => handleTrackEnd();
+    const onPlaying = () => {
+      setIsBuffering(false);
+      setPlaybackError(null);
+      if (bufferTimeoutRef.current) { clearTimeout(bufferTimeoutRef.current); bufferTimeoutRef.current = null; }
+      setState(s => ({ ...s, isPlaying: true }));
+    };
+    const onWaiting = () => setIsBuffering(true);
+    const onError = () => {
+      console.error('[Player] Audio error');
+      setIsBuffering(false);
+      setPlaybackError('Playback failed');
+      setState(s => ({ ...s, isPlaying: false }));
+    };
 
     audio.addEventListener('timeupdate', onTimeUpdate);
     audio.addEventListener('loadedmetadata', onLoadedMeta);
     audio.addEventListener('ended', onEnded);
+    audio.addEventListener('playing', onPlaying);
+    audio.addEventListener('waiting', onWaiting);
+    audio.addEventListener('error', onError);
 
     return () => {
       audio.removeEventListener('timeupdate', onTimeUpdate);
       audio.removeEventListener('loadedmetadata', onLoadedMeta);
       audio.removeEventListener('ended', onEnded);
+      audio.removeEventListener('playing', onPlaying);
+      audio.removeEventListener('waiting', onWaiting);
+      audio.removeEventListener('error', onError);
       audio.pause();
       crossfadeAudioRef.current?.pause();
     };
@@ -148,13 +171,9 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       return;
     }
     try {
-      if (!audioContextRef.current) {
-        audioContextRef.current = new AudioContext();
-      }
+      if (!audioContextRef.current) audioContextRef.current = new AudioContext();
       const ctx = audioContextRef.current;
-      if (!sourceRef.current) {
-        sourceRef.current = ctx.createMediaElementSource(audioRef.current);
-      }
+      if (!sourceRef.current) sourceRef.current = ctx.createMediaElementSource(audioRef.current);
       const analyser = ctx.createAnalyser();
       analyser.fftSize = 256;
       sourceRef.current.connect(analyser);
@@ -230,6 +249,18 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   }, []);
 
   const resolveAndPlay = useCallback(async (track: Track, audio: HTMLAudioElement) => {
+    setIsBuffering(true);
+    setPlaybackError(null);
+    setState(s => ({ ...s, progress: 0, duration: 0 }));
+
+    // Buffer timeout — show retry after 8s
+    if (bufferTimeoutRef.current) clearTimeout(bufferTimeoutRef.current);
+    bufferTimeoutRef.current = window.setTimeout(() => {
+      setIsBuffering(false);
+      setPlaybackError('Took too long to load. Tap retry.');
+      setState(s => ({ ...s, isPlaying: false }));
+    }, 8000);
+
     // Unlock audio element synchronously (for mobile gesture context)
     try { await audio.play().catch(() => {}); } catch {}
     audio.pause();
@@ -240,26 +271,24 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         src = await getStreamUrl(track.id);
       }
       if (!src || src.includes('youtube.com/watch')) {
-        console.error('Invalid stream URL received:', src);
-        setState(s => ({ ...s, isPlaying: false }));
-        return;
+        throw new Error('Invalid stream URL');
       }
       audio.src = src;
       await audio.play();
       if (audioContextRef.current?.state === 'suspended') audioContextRef.current.resume();
-    } catch (err) {
+    } catch (err: any) {
+      console.warn('[Player] First attempt failed:', err.message);
       // Auto-retry once
       try {
         const src = await getStreamUrl(track.id);
-        if (!src || src.includes('youtube.com/watch')) {
-          console.error('Invalid stream URL on retry:', src);
-          setState(s => ({ ...s, isPlaying: false }));
-          return;
-        }
+        if (!src || src.includes('youtube.com/watch')) throw new Error('Invalid stream URL');
         audio.src = src;
         await audio.play();
-      } catch (retryErr) {
-        console.error('Playback failed after retry', retryErr);
+      } catch (retryErr: any) {
+        console.error('[Player] Playback failed after retry:', retryErr.message);
+        if (bufferTimeoutRef.current) { clearTimeout(bufferTimeoutRef.current); bufferTimeoutRef.current = null; }
+        setIsBuffering(false);
+        setPlaybackError('Could not play this track. Tap retry.');
         setState(s => ({ ...s, isPlaying: false }));
       }
     }
@@ -292,6 +321,14 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     });
   }, [getSmartShuffleIndex, resolveAndPlay]);
 
+  const retryPlayback = useCallback(() => {
+    const track = state.currentTrack;
+    if (track && audioRef.current) {
+      resolveAndPlay(track, audioRef.current);
+      setState(s => ({ ...s, isPlaying: true }));
+    }
+  }, [state.currentTrack, resolveAndPlay]);
+
   const play = useCallback((track: Track, queue?: Track[]) => {
     const q = queue || [track];
     const idx = q.findIndex(t => t.id === track.id);
@@ -303,10 +340,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }
       return { ...s, currentTrack: track, queue: q, queueIndex: idx >= 0 ? idx : 0, isPlaying: true };
     });
-    if (audioRef.current) {
-      resolveAndPlay(track, audioRef.current);
-    }
-    // Pre-buffer next track
+    if (audioRef.current) resolveAndPlay(track, audioRef.current);
     const nextIdx = idx + 1;
     if (nextIdx < q.length && needsStreamResolution(q[nextIdx])) {
       preBufferTrack(q[nextIdx].id);
@@ -339,46 +373,11 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const toggleShuffle = useCallback(() => { setState(s => { const next = !s.shuffle; localStorage.setItem('ph-shuffle', String(next)); return { ...s, shuffle: next }; }); }, []);
   const toggleRepeat = useCallback(() => { setState(s => { const modes: RepeatMode[] = ['off', 'all', 'one']; const next = modes[(modes.indexOf(s.repeat) + 1) % 3]; localStorage.setItem('ph-repeat', next); return { ...s, repeat: next }; }); }, []);
 
-  const addToQueue = useCallback((track: Track) => {
-    setState(s => ({ ...s, queue: [...s.queue, track] }));
-  }, []);
-
-  const playNext = useCallback((track: Track) => {
-    setState(s => {
-      const newQueue = [...s.queue];
-      newQueue.splice(s.queueIndex + 1, 0, track);
-      return { ...s, queue: newQueue };
-    });
-  }, []);
-
-  const removeFromQueue = useCallback((index: number) => {
-    setState(s => {
-      if (index === s.queueIndex) return s; // don't remove current
-      const newQueue = s.queue.filter((_, i) => i !== index);
-      const newIndex = index < s.queueIndex ? s.queueIndex - 1 : s.queueIndex;
-      return { ...s, queue: newQueue, queueIndex: newIndex };
-    });
-  }, []);
-
-  const reorderQueue = useCallback((from: number, to: number) => {
-    setState(s => {
-      const newQueue = [...s.queue];
-      const [moved] = newQueue.splice(from, 1);
-      newQueue.splice(to, 0, moved);
-      let newIndex = s.queueIndex;
-      if (from === s.queueIndex) newIndex = to;
-      else if (from < s.queueIndex && to >= s.queueIndex) newIndex--;
-      else if (from > s.queueIndex && to <= s.queueIndex) newIndex++;
-      return { ...s, queue: newQueue, queueIndex: newIndex };
-    });
-  }, []);
-
-  const clearQueue = useCallback(() => {
-    setState(s => {
-      const current = s.currentTrack;
-      return { ...s, queue: current ? [current] : [], queueIndex: current ? 0 : -1 };
-    });
-  }, []);
+  const addToQueue = useCallback((track: Track) => { setState(s => ({ ...s, queue: [...s.queue, track] })); }, []);
+  const playNext = useCallback((track: Track) => { setState(s => { const nq = [...s.queue]; nq.splice(s.queueIndex + 1, 0, track); return { ...s, queue: nq }; }); }, []);
+  const removeFromQueue = useCallback((index: number) => { setState(s => { if (index === s.queueIndex) return s; const nq = s.queue.filter((_, i) => i !== index); const ni = index < s.queueIndex ? s.queueIndex - 1 : s.queueIndex; return { ...s, queue: nq, queueIndex: ni }; }); }, []);
+  const reorderQueue = useCallback((from: number, to: number) => { setState(s => { const nq = [...s.queue]; const [moved] = nq.splice(from, 1); nq.splice(to, 0, moved); let ni = s.queueIndex; if (from === s.queueIndex) ni = to; else if (from < s.queueIndex && to >= s.queueIndex) ni--; else if (from > s.queueIndex && to <= s.queueIndex) ni++; return { ...s, queue: nq, queueIndex: ni }; }); }, []);
+  const clearQueue = useCallback(() => { setState(s => { const c = s.currentTrack; return { ...s, queue: c ? [c] : [], queueIndex: c ? 0 : -1 }; }); }, []);
 
   const onTrackPlay = useCallback((cb: (track: Track) => void) => { trackPlayListeners.current.add(cb); return () => { trackPlayListeners.current.delete(cb); }; }, []);
   const setCrossfadeDuration = useCallback((d: CrossfadeMode) => { localStorage.setItem('ph-crossfade', String(d)); setCrossfadeDurationState(d); }, []);
@@ -411,6 +410,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       analyserNode: analyserRef.current,
       visualizerEnabled, setVisualizerEnabled,
       workoutMode, setWorkoutMode, targetBPM, setTargetBPM,
+      isBuffering, playbackError, retryPlayback,
     }}>
       {children}
     </PlayerContext.Provider>

@@ -1,6 +1,6 @@
 import { Track } from '@/types/music';
 
-const BASE_URL = 'https://ytmusic-backend-xi5y.onrender.com';
+const BASE_URL = 'http://140.238.167.236';
 
 // In-memory search cache (last 20 queries)
 const searchCache = new Map<string, { data: Track[]; timestamp: number }>();
@@ -11,9 +11,11 @@ const CACHE_TTL = 5 * 60 * 1000;
 const streamCache = new Map<string, { url: string; timestamp: number }>();
 const STREAM_CACHE_TTL = 30 * 60 * 1000;
 
+// In-flight stream dedup
+const inflightStreams = new Map<string, Promise<string>>();
+
 // Abort controller for cancelling previous user-initiated searches only
 let currentSearchController: AbortController | null = null;
-let isUserSearch = false;
 
 function trimCache<T>(cache: Map<string, T>, max: number) {
   if (cache.size > max) {
@@ -36,7 +38,7 @@ function mapYTTrack(item: any): Track {
     album_id: item.album?.id || item.album_id || '',
     album_image: extractThumbnail(item.thumbnails || item.thumbnail),
     duration: item.duration_seconds || item.duration || 0,
-    audio: '', // resolved on play via getStreamUrl
+    audio: '',
     position: 0,
   };
 }
@@ -51,6 +53,37 @@ function extractThumbnail(thumbnails: any): string {
   return thumbnails.url || '';
 }
 
+async function fetchWithTimeout(url: string, opts: RequestInit = {}, timeoutMs = 15000): Promise<Response> {
+  const controller = new AbortController();
+  const existingSignal = opts.signal;
+  const id = setTimeout(() => controller.abort(), timeoutMs);
+
+  // Merge abort signals
+  if (existingSignal) {
+    existingSignal.addEventListener('abort', () => controller.abort());
+  }
+
+  try {
+    const res = await fetch(url, { ...opts, signal: controller.signal });
+    return res;
+  } finally {
+    clearTimeout(id);
+  }
+}
+
+async function fetchWithRetry(url: string, opts: RequestInit = {}, timeoutMs = 15000): Promise<Response> {
+  try {
+    const res = await fetchWithTimeout(url, opts, timeoutMs);
+    if (res.status >= 500) throw new Error(`Server error: ${res.status}`);
+    return res;
+  } catch (err: any) {
+    if (err.name === 'AbortError' && opts.signal?.aborted) throw err; // user-initiated abort
+    // Retry once
+    console.warn(`[ytmusic] Retrying: ${url}`, err.message);
+    return fetchWithTimeout(url, opts, timeoutMs);
+  }
+}
+
 export async function searchYTMusic(query: string, limit = 20, cancelPrevious = false): Promise<Track[]> {
   const cacheKey = `${query}:${limit}`;
   const cached = searchCache.get(cacheKey);
@@ -58,30 +91,33 @@ export async function searchYTMusic(query: string, limit = 20, cancelPrevious = 
     return cached.data;
   }
 
-  // Only cancel previous request for user-initiated searches (search page)
   let signal: AbortSignal | undefined;
   if (cancelPrevious) {
-    if (currentSearchController) {
-      currentSearchController.abort();
-    }
+    if (currentSearchController) currentSearchController.abort();
     currentSearchController = new AbortController();
     signal = currentSearchController.signal;
   }
 
-  const res = await fetch(
-    `${BASE_URL}/search?q=${encodeURIComponent(query)}`,
-    signal ? { signal } : {}
-  );
-  if (!res.ok) throw new Error(`Search failed: ${res.status}`);
+  try {
+    const res = await fetchWithRetry(
+      `${BASE_URL}/search?q=${encodeURIComponent(query)}`,
+      signal ? { signal } : {},
+      15000
+    );
+    if (!res.ok) throw new Error(`Search failed: ${res.status}`);
 
-  const data = await res.json();
-  const results = Array.isArray(data) ? data : data.results || data.items || [];
-  const tracks = results.slice(0, limit).map(mapYTTrack).filter((t: Track) => t.id);
+    const data = await res.json();
+    const results = Array.isArray(data) ? data : data.results || data.items || [];
+    const tracks = results.slice(0, limit).map(mapYTTrack).filter((t: Track) => t.id);
 
-  searchCache.set(cacheKey, { data: tracks, timestamp: Date.now() });
-  trimCache(searchCache, CACHE_MAX);
-
-  return tracks;
+    searchCache.set(cacheKey, { data: tracks, timestamp: Date.now() });
+    trimCache(searchCache, CACHE_MAX);
+    return tracks;
+  } catch (err: any) {
+    if (err.name === 'AbortError') throw err;
+    console.error('[ytmusic] Search error:', err.message);
+    return []; // graceful empty
+  }
 }
 
 export async function getStreamUrl(videoId: string): Promise<string> {
@@ -90,35 +126,48 @@ export async function getStreamUrl(videoId: string): Promise<string> {
     return cached.url;
   }
 
-  const res = await fetch(`${BASE_URL}/stream?videoId=${encodeURIComponent(videoId)}`);
-  if (!res.ok) throw new Error(`Stream failed: ${res.status}`);
+  // Dedup in-flight requests for same videoId
+  const inflight = inflightStreams.get(videoId);
+  if (inflight) return inflight;
 
-  const data = await res.json();
-  const url = data.audio_url || data.url || data.stream_url || '';
-  
-  // Validate we got an actual stream URL, not a watch page
-  if (!url || url.includes('youtube.com/watch') || url.includes('youtu.be/')) {
-    console.error('Backend returned non-streamable URL:', url);
-    throw new Error('Backend returned a YouTube watch URL instead of a direct audio stream. The stream backend needs to be fixed to return a direct audio URL.');
-  }
+  const promise = (async () => {
+    try {
+      const res = await fetchWithRetry(
+        `${BASE_URL}/stream?videoId=${encodeURIComponent(videoId)}`,
+        {},
+        15000
+      );
+      if (!res.ok) throw new Error(`Stream failed: ${res.status}`);
 
-  streamCache.set(videoId, { url, timestamp: Date.now() });
-  trimCache(streamCache, 50);
+      const data = await res.json();
+      const url = data.audio_url || data.url || data.stream_url || '';
 
-  return url;
+      if (!url || url.includes('youtube.com/watch') || url.includes('youtu.be/')) {
+        throw new Error('Backend returned non-streamable URL');
+      }
+
+      streamCache.set(videoId, { url, timestamp: Date.now() });
+      trimCache(streamCache, 50);
+      return url;
+    } finally {
+      inflightStreams.delete(videoId);
+    }
+  })();
+
+  inflightStreams.set(videoId, promise);
+  return promise;
 }
 
 export function needsStreamResolution(track: Track): boolean {
   return !track.audio || track.audio === '';
 }
 
-// Curated searches to power the home page
 export async function getTrendingYT(limit = 10): Promise<Track[]> {
-  return searchYTMusic('top hits 2026 trending', limit);
+  return searchYTMusic('top hits 2025 trending', limit);
 }
 
 export async function getNewReleasesYT(limit = 10): Promise<Track[]> {
-  return searchYTMusic('new music releases 2026', limit);
+  return searchYTMusic('new music releases 2025', limit);
 }
 
 export async function getPopularArtistsYT(limit = 8): Promise<Track[]> {
@@ -143,7 +192,6 @@ export async function getTracksByGenreYT(genre: string, limit = 20): Promise<Tra
   return searchYTMusic(`${genre} music popular`, limit);
 }
 
-// Pre-buffer: resolve stream URL for a track without playing
 export async function preBufferTrack(videoId: string): Promise<void> {
   try {
     await getStreamUrl(videoId);

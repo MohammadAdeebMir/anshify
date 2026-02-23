@@ -1,6 +1,20 @@
 import { Track } from '@/types/music';
+import { supabase } from '@/integrations/supabase/client';
 
-const BASE_URL = 'http://140.238.167.236:8000';
+// Must proxy through edge function: app is HTTPS, backend is HTTP (mixed content blocked by browsers)
+function getProxyUrl(endpoint: string, params: Record<string, string>): string {
+  const supabaseUrl = (supabase as any).supabaseUrl || import.meta.env.VITE_SUPABASE_URL;
+  const searchParams = new URLSearchParams({ endpoint, ...params });
+  return `${supabaseUrl}/functions/v1/music-proxy?${searchParams.toString()}`;
+}
+
+function getProxyHeaders(): Record<string, string> {
+  const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+  return {
+    'apikey': anonKey,
+    'Authorization': `Bearer ${anonKey}`,
+  };
+}
 
 // In-memory search cache (last 20 queries)
 const searchCache = new Map<string, { data: Track[]; timestamp: number }>();
@@ -100,8 +114,8 @@ export async function searchYTMusic(query: string, limit = 20, cancelPrevious = 
 
   try {
     const res = await fetchWithRetry(
-      `${BASE_URL}/search?q=${encodeURIComponent(query)}`,
-      { ...(signal ? { signal } : {}) },
+      getProxyUrl('search', { q: query }),
+      { ...(signal ? { signal } : {}), headers: getProxyHeaders() },
       10000
     );
     if (!res.ok) throw new Error(`Search failed: ${res.status}`);
@@ -133,8 +147,8 @@ export async function getStreamUrl(videoId: string): Promise<string> {
   const promise = (async () => {
     try {
       const res = await fetchWithRetry(
-        `${BASE_URL}/stream?videoId=${encodeURIComponent(videoId)}`,
-        {},
+        getProxyUrl('stream', { videoId }),
+        { headers: getProxyHeaders() },
         15000
       );
       if (!res.ok) throw new Error(`Stream failed: ${res.status}`);

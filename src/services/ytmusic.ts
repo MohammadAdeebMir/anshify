@@ -1,6 +1,6 @@
 import { Track } from '@/types/music';
 
-const BASE_URL = 'http://140.238.167.236';
+const BASE_URL = 'http://140.238.167.236:8000';
 
 // In-memory search cache (last 20 queries)
 const searchCache = new Map<string, { data: Track[]; timestamp: number }>();
@@ -140,7 +140,13 @@ export async function getStreamUrl(videoId: string): Promise<string> {
       if (!res.ok) throw new Error(`Stream failed: ${res.status}`);
 
       const data = await res.json();
-      const url = data.audio_url || data.url || data.stream_url || '';
+      
+      // Backend returns {success: true, url: "..."} 
+      if (data.success === false) {
+        throw new Error('Backend reported stream failure');
+      }
+      
+      const url = data.url || data.audio_url || data.stream_url || '';
 
       if (!url || url.includes('youtube.com/watch') || url.includes('youtu.be/')) {
         throw new Error('Backend returned non-streamable URL');

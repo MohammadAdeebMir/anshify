@@ -122,7 +122,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   useEffect(() => {
     const audio = new Audio();
     audio.volume = state.volume;
-    audio.crossOrigin = 'anonymous';
+    // No crossOrigin — googlevideo URLs don't support CORS headers
     audioRef.current = audio;
     crossfadeAudioRef.current = new Audio();
     crossfadeAudioRef.current.volume = 0;

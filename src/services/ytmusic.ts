@@ -1,7 +1,9 @@
 import { Track } from '@/types/music';
 import { supabase } from '@/integrations/supabase/client';
 
-// Must proxy through edge function: app is HTTPS, backend is HTTP (mixed content blocked by browsers)
+const BACKEND_BASE = 'http://140.238.167.236:8000';
+
+// Proxy through edge function: app is HTTPS, backend is HTTP (Mixed Content blocked by browsers)
 function getProxyUrl(endpoint: string, params: Record<string, string>): string {
   const supabaseUrl = (supabase as any).supabaseUrl || import.meta.env.VITE_SUPABASE_URL;
   const searchParams = new URLSearchParams({ endpoint, ...params });
@@ -15,6 +17,8 @@ function getProxyHeaders(): Record<string, string> {
     'Authorization': `Bearer ${anonKey}`,
   };
 }
+
+console.log('[ytmusic] Using proxy to backend:', BACKEND_BASE);
 
 // In-memory search cache (last 20 queries)
 const searchCache = new Map<string, { data: Track[]; timestamp: number }>();
@@ -158,16 +162,16 @@ export async function getStreamUrl(videoId: string): Promise<string> {
       }
 
       // Backend returns { success: true, url: "https://rrX---googlevideo.com/..." }
-      const url = data.url || '';
-      console.log('[ytmusic] AUDIO SRC:', url);
+      const audioUrl = data.url || '';
+      console.log('[ytmusic] AUDIO SRC:', audioUrl);
 
-      if (!url || url.includes('youtube.com/watch') || url.includes('youtu.be/')) {
+      if (!audioUrl || audioUrl.includes('youtube.com/watch') || audioUrl.includes('youtu.be/')) {
         throw new Error('Backend returned non-streamable URL');
       }
 
-      streamCache.set(videoId, { url, timestamp: Date.now() });
+      streamCache.set(videoId, { url: audioUrl, timestamp: Date.now() });
       trimCache(streamCache, 50);
-      return url;
+      return audioUrl;
     } finally {
       inflightStreams.delete(videoId);
     }

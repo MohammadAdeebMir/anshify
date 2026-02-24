@@ -72,7 +72,6 @@ async function fetchWithTimeout(url: string, opts: RequestInit = {}, timeoutMs =
   const existingSignal = opts.signal;
   const id = setTimeout(() => controller.abort(), timeoutMs);
 
-  // Merge abort signals
   if (existingSignal) {
     existingSignal.addEventListener('abort', () => controller.abort());
   }
@@ -91,8 +90,7 @@ async function fetchWithRetry(url: string, opts: RequestInit = {}, timeoutMs = 1
     if (res.status >= 500) throw new Error(`Server error: ${res.status}`);
     return res;
   } catch (err: any) {
-    if (err.name === 'AbortError' && opts.signal?.aborted) throw err; // user-initiated abort
-    // Retry once
+    if (err.name === 'AbortError' && opts.signal?.aborted) throw err;
     console.warn(`[ytmusic] Retrying: ${url}`, err.message);
     return fetchWithTimeout(url, opts, timeoutMs);
   }
@@ -130,7 +128,7 @@ export async function searchYTMusic(query: string, limit = 20, cancelPrevious = 
   } catch (err: any) {
     if (err.name === 'AbortError') throw err;
     console.error('[ytmusic] Search error:', err.message);
-    return []; // graceful empty
+    return [];
   }
 }
 
@@ -140,7 +138,6 @@ export async function getStreamUrl(videoId: string): Promise<string> {
     return cached.url;
   }
 
-  // Dedup in-flight requests for same videoId
   const inflight = inflightStreams.get(videoId);
   if (inflight) return inflight;
 
@@ -154,13 +151,15 @@ export async function getStreamUrl(videoId: string): Promise<string> {
       if (!res.ok) throw new Error(`Stream failed: ${res.status}`);
 
       const data = await res.json();
-      
-      // Backend returns {success: true, url: "..."} 
+      console.log('[ytmusic] STREAM RESPONSE:', data);
+
       if (data.success === false) {
         throw new Error('Backend reported stream failure');
       }
-      
-      const url = data.url || data.audio_url || data.stream_url || '';
+
+      // Backend returns { success: true, url: "https://rrX---googlevideo.com/..." }
+      const url = data.url || '';
+      console.log('[ytmusic] AUDIO SRC:', url);
 
       if (!url || url.includes('youtube.com/watch') || url.includes('youtu.be/')) {
         throw new Error('Backend returned non-streamable URL');

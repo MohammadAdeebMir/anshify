@@ -1,24 +1,8 @@
 import { Track } from '@/types/music';
-import { supabase } from '@/integrations/supabase/client';
 
-const BACKEND_BASE = 'http://140.238.167.236:8000';
+const BACKEND_BASE = 'https://api.anshify.store';
 
-// Proxy through edge function: app is HTTPS, backend is HTTP (Mixed Content blocked by browsers)
-function getProxyUrl(endpoint: string, params: Record<string, string>): string {
-  const supabaseUrl = (supabase as any).supabaseUrl || import.meta.env.VITE_SUPABASE_URL;
-  const searchParams = new URLSearchParams({ endpoint, ...params });
-  return `${supabaseUrl}/functions/v1/music-proxy?${searchParams.toString()}`;
-}
-
-function getProxyHeaders(): Record<string, string> {
-  const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-  return {
-    'apikey': anonKey,
-    'Authorization': `Bearer ${anonKey}`,
-  };
-}
-
-console.log('[ytmusic] Using proxy to backend:', BACKEND_BASE);
+console.log('[ytmusic] BASE URL:', BACKEND_BASE);
 
 // In-memory search cache (last 20 queries)
 const searchCache = new Map<string, { data: Track[]; timestamp: number }>();
@@ -32,7 +16,7 @@ const STREAM_CACHE_TTL = 30 * 60 * 1000;
 // In-flight stream dedup
 const inflightStreams = new Map<string, Promise<string>>();
 
-// Abort controller for cancelling previous user-initiated searches only
+// Abort controller for cancelling previous user-initiated searches
 let currentSearchController: AbortController | null = null;
 
 function trimCache<T>(cache: Map<string, T>, max: number) {
@@ -81,8 +65,7 @@ async function fetchWithTimeout(url: string, opts: RequestInit = {}, timeoutMs =
   }
 
   try {
-    const res = await fetch(url, { ...opts, signal: controller.signal });
-    return res;
+    return await fetch(url, { ...opts, signal: controller.signal });
   } finally {
     clearTimeout(id);
   }
@@ -115,11 +98,10 @@ export async function searchYTMusic(query: string, limit = 20, cancelPrevious = 
   }
 
   try {
-    const res = await fetchWithRetry(
-      getProxyUrl('search', { q: query }),
-      { ...(signal ? { signal } : {}), headers: getProxyHeaders() },
-      10000
-    );
+    const url = `${BACKEND_BASE}/search?q=${encodeURIComponent(query)}`;
+    console.log('[ytmusic] Search URL:', url);
+
+    const res = await fetchWithRetry(url, signal ? { signal } : {}, 10000);
     if (!res.ok) throw new Error(`Search failed: ${res.status}`);
 
     const data = await res.json();
@@ -147,22 +129,20 @@ export async function getStreamUrl(videoId: string): Promise<string> {
 
   const promise = (async () => {
     try {
-      const res = await fetchWithRetry(
-        getProxyUrl('stream', { videoId }),
-        { headers: getProxyHeaders() },
-        15000
-      );
+      const url = `${BACKEND_BASE}/stream?videoId=${videoId}`;
+      console.log('[ytmusic] Stream URL:', url);
+
+      const res = await fetchWithRetry(url, {}, 15000);
       if (!res.ok) throw new Error(`Stream failed: ${res.status}`);
 
       const data = await res.json();
       console.log('[ytmusic] STREAM RESPONSE:', data);
 
-      if (data.success === false) {
+      if (!data.success || !data.url) {
         throw new Error('Backend reported stream failure');
       }
 
-      // Backend returns { success: true, url: "https://rrX---googlevideo.com/..." }
-      const audioUrl = data.url || '';
+      const audioUrl = data.url;
       console.log('[ytmusic] AUDIO SRC:', audioUrl);
 
       if (!audioUrl || audioUrl.includes('youtube.com/watch') || audioUrl.includes('youtu.be/')) {

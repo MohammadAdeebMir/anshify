@@ -326,9 +326,10 @@ export const PlayerBar = () => {
         >
           <div className="absolute inset-0"
             style={{
-              background: 'linear-gradient(180deg, hsl(0 0% 5% / 0.97) 0%, hsl(0 0% 2% / 0.99) 100%)',
+              background: 'linear-gradient(180deg, hsl(0 0% 7% / 0.97) 0%, hsl(0 0% 2% / 0.99) 100%)',
               backdropFilter: 'blur(40px)', WebkitBackdropFilter: 'blur(40px)',
-              borderTop: '1px solid hsl(0 0% 15% / 0.4)',
+              borderTop: '1px solid hsl(0 0% 18% / 0.3)',
+              boxShadow: '0 -8px 32px hsl(0 0% 0% / 0.5), 0 -1px 0 hsl(200 60% 50% / 0.06)',
             }}
           />
 

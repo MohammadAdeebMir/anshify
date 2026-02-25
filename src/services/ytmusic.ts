@@ -1,8 +1,22 @@
 import { Track } from '@/types/music';
 
-const BACKEND_BASE = 'https://api.anshify.store';
+// Use the music-proxy edge function to bypass CORS
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
-console.log('[ytmusic] BASE URL:', BACKEND_BASE);
+function getProxyUrl(endpoint: string, params: Record<string, string>): string {
+  const searchParams = new URLSearchParams({ endpoint, ...params });
+  return `${SUPABASE_URL}/functions/v1/music-proxy?${searchParams.toString()}`;
+}
+
+function getProxyHeaders(): Record<string, string> {
+  return {
+    'Authorization': `Bearer ${SUPABASE_KEY}`,
+    'apikey': SUPABASE_KEY,
+  };
+}
+
+console.log('[ytmusic] Using proxy via edge function');
 
 // In-memory search cache (last 20 queries)
 const searchCache = new Map<string, { data: Track[]; timestamp: number }>();
@@ -98,13 +112,17 @@ export async function searchYTMusic(query: string, limit = 20, cancelPrevious = 
   }
 
   try {
-    const url = `${BACKEND_BASE}/search?q=${encodeURIComponent(query)}`;
+    const url = getProxyUrl('search', { q: query });
     console.log('[ytmusic] Search URL:', url);
 
-    const res = await fetchWithRetry(url, signal ? { signal } : {}, 10000);
+    const res = await fetchWithRetry(url, {
+      headers: getProxyHeaders(),
+      ...(signal ? { signal } : {}),
+    }, 12000);
     if (!res.ok) throw new Error(`Search failed: ${res.status}`);
 
     const data = await res.json();
+    console.log('[ytmusic] Search response type:', Array.isArray(data) ? 'array' : typeof data);
     const results = Array.isArray(data) ? data : data.results || data.items || [];
     const tracks = results.slice(0, limit).map(mapYTTrack).filter((t: Track) => t.id);
 
@@ -129,10 +147,10 @@ export async function getStreamUrl(videoId: string): Promise<string> {
 
   const promise = (async () => {
     try {
-      const url = `${BACKEND_BASE}/stream?videoId=${videoId}`;
-      console.log('[ytmusic] Stream URL:', url);
+      const url = getProxyUrl('stream', { videoId });
+      console.log('[ytmusic] Stream request:', url);
 
-      const res = await fetchWithRetry(url, {}, 15000);
+      const res = await fetchWithRetry(url, { headers: getProxyHeaders() }, 15000);
       if (!res.ok) throw new Error(`Stream failed: ${res.status}`);
 
       const data = await res.json();

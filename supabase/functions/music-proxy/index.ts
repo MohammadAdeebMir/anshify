@@ -1,6 +1,9 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
-const BACKEND = "http://140.238.167.236:8000";
+const BACKENDS = [
+  "https://api.anshify.store",
+  "http://140.238.167.236:8000",
+];
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -13,7 +16,7 @@ serve(async (req) => {
   }
 
   const url = new URL(req.url);
-  const endpoint = url.searchParams.get("endpoint"); // "search" or "stream"
+  const endpoint = url.searchParams.get("endpoint");
 
   if (!endpoint || !["search", "stream"].includes(endpoint)) {
     return new Response(JSON.stringify({ error: "Invalid endpoint" }), {
@@ -22,32 +25,42 @@ serve(async (req) => {
     });
   }
 
-  // Build backend URL with remaining params
   const params = new URLSearchParams();
   url.searchParams.forEach((v, k) => {
     if (k !== "endpoint") params.set(k, v);
   });
 
-  const backendUrl = `${BACKEND}/${endpoint}?${params.toString()}`;
+  let lastError: Error | null = null;
 
-  try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 20000);
+  for (const backend of BACKENDS) {
+    const backendUrl = `${backend}/${endpoint}?${params.toString()}`;
+    console.log(`Trying: ${backendUrl}`);
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 15000);
+      const res = await fetch(backendUrl, { signal: controller.signal });
+      clearTimeout(timeout);
 
-    const res = await fetch(backendUrl, { signal: controller.signal });
-    clearTimeout(timeout);
+      if (res.status >= 500) {
+        lastError = new Error(`Server error ${res.status}`);
+        continue;
+      }
 
-    const body = await res.text();
-
-    return new Response(body, {
-      status: res.status,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
-  } catch (err) {
-    console.error("Proxy error:", err);
-    return new Response(JSON.stringify({ error: "Backend unreachable" }), {
-      status: 502,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+      const body = await res.text();
+      console.log(`Success from ${backend}`);
+      return new Response(body, {
+        status: res.status,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    } catch (err) {
+      console.warn(`Failed ${backend}:`, err.message);
+      lastError = err;
+    }
   }
+
+  console.error("All backends failed:", lastError?.message);
+  return new Response(JSON.stringify({ error: "Backend unreachable" }), {
+    status: 502,
+    headers: { ...corsHeaders, "Content-Type": "application/json" },
+  });
 });

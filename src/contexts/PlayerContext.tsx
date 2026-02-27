@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useRef, useCallback, useEffect } from 'react';
 import { Track, RepeatMode, PlayerState } from '@/types/music';
-import { getStreamUrl, needsStreamResolution, preBufferTrack } from '@/services/ytmusic';
+import { useYouTubePlayer } from '@/hooks/useYouTubePlayer';
+import { preBufferTrack } from '@/services/ytmusic';
 
 export type CrossfadeMode = 0 | 3 | 5 | 8 | 12;
 
@@ -78,13 +79,9 @@ function loadQueue(): { queue: Track[]; queueIndex: number; currentTrack: Track 
 }
 
 export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const crossfadeAudioRef = useRef<HTMLAudioElement | null>(null);
+  const yt = useYouTubePlayer('yt-player-hidden');
   const trackPlayListeners = useRef<Set<(track: Track) => void>>(new Set());
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const analyserRef = useRef<AnalyserNode | null>(null);
-  const sourceRef = useRef<MediaElementAudioSourceNode | null>(null);
-  const bufferTimeoutRef = useRef<number | null>(null);
+  const progressIntervalRef = useRef<number | null>(null);
 
   const [isBuffering, setIsBuffering] = useState(false);
   const [playbackError, setPlaybackError] = useState<string | null>(null);
@@ -117,72 +114,58 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   });
 
   const recentArtistsRef = useRef<string[]>([]);
+  const stateRef = useRef(state);
+  stateRef.current = state;
 
-  // Setup audio
+  // Set initial volume
   useEffect(() => {
-    const audio = new Audio();
-    audio.volume = state.volume;
-    // No crossOrigin — googlevideo URLs don't support CORS headers
-    audioRef.current = audio;
-    crossfadeAudioRef.current = new Audio();
-    crossfadeAudioRef.current.volume = 0;
+    if (yt.isReady) {
+      yt.setVolume(state.volume);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [yt.isReady]);
 
-    const onTimeUpdate = () => setState(s => ({ ...s, progress: audio.currentTime }));
-    const onLoadedMeta = () => setState(s => ({ ...s, duration: audio.duration }));
-    const onEnded = () => handleTrackEnd();
-    const onPlaying = () => {
+  // Sync YT player state → our state
+  useEffect(() => {
+    const ytState = yt.playerState;
+    if (ytState === 'playing') {
       setIsBuffering(false);
       setPlaybackError(null);
-      if (bufferTimeoutRef.current) { clearTimeout(bufferTimeoutRef.current); bufferTimeoutRef.current = null; }
       setState(s => ({ ...s, isPlaying: true }));
-    };
-    const onWaiting = () => setIsBuffering(true);
-    const onError = () => {
-      console.error('[Player] Audio error');
-      setIsBuffering(false);
-      setPlaybackError('Playback failed');
+    } else if (ytState === 'paused') {
       setState(s => ({ ...s, isPlaying: false }));
-    };
-
-    audio.addEventListener('timeupdate', onTimeUpdate);
-    audio.addEventListener('loadedmetadata', onLoadedMeta);
-    audio.addEventListener('ended', onEnded);
-    audio.addEventListener('playing', onPlaying);
-    audio.addEventListener('waiting', onWaiting);
-    audio.addEventListener('error', onError);
-
-    return () => {
-      audio.removeEventListener('timeupdate', onTimeUpdate);
-      audio.removeEventListener('loadedmetadata', onLoadedMeta);
-      audio.removeEventListener('ended', onEnded);
-      audio.removeEventListener('playing', onPlaying);
-      audio.removeEventListener('waiting', onWaiting);
-      audio.removeEventListener('error', onError);
-      audio.pause();
-      crossfadeAudioRef.current?.pause();
-    };
+    } else if (ytState === 'buffering') {
+      setIsBuffering(true);
+    } else if (ytState === 'ended') {
+      setIsBuffering(false);
+      handleTrackEndRef.current();
+    } else if (ytState === 'error') {
+      setIsBuffering(false);
+      setPlaybackError('Could not play this track. Tap retry.');
+      setState(s => ({ ...s, isPlaying: false }));
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [yt.playerState]);
 
-  // Setup analyser on demand
+  // Progress polling via rAF
   useEffect(() => {
-    if (!visualizerEnabled || !audioRef.current) {
-      analyserRef.current = null;
-      return;
-    }
-    try {
-      if (!audioContextRef.current) audioContextRef.current = new AudioContext();
-      const ctx = audioContextRef.current;
-      if (!sourceRef.current) sourceRef.current = ctx.createMediaElementSource(audioRef.current);
-      const analyser = ctx.createAnalyser();
-      analyser.fftSize = 256;
-      sourceRef.current.connect(analyser);
-      analyser.connect(ctx.destination);
-      analyserRef.current = analyser;
-    } catch {
-      analyserRef.current = null;
-    }
-  }, [visualizerEnabled]);
+    let rafId: number;
+    const tick = () => {
+      if (yt.isReady) {
+        const progress = yt.getProgress();
+        const duration = yt.getDuration();
+        setState(s => {
+          if (Math.abs(s.progress - progress) > 0.3 || Math.abs(s.duration - duration) > 0.5) {
+            return { ...s, progress, duration };
+          }
+          return s;
+        });
+      }
+      rafId = requestAnimationFrame(tick);
+    };
+    rafId = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(rafId);
+  }, [yt]);
 
   // Media Session API
   useEffect(() => {
@@ -193,7 +176,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         title: state.currentTrack.name,
         artist: state.currentTrack.artist_name,
         album: state.currentTrack.album_name,
-        artwork: [{ src: state.currentTrack.album_image, sizes: '512x512', type: 'image/jpeg' }],
+        artwork: state.currentTrack.album_image ? [{ src: state.currentTrack.album_image, sizes: '512x512', type: 'image/jpeg' }] : [],
       });
     }
     ms.playbackState = state.isPlaying ? 'playing' : 'paused';
@@ -203,7 +186,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     if (!('mediaSession' in navigator)) return;
     const ms = navigator.mediaSession;
     ms.setActionHandler('play', () => resume());
-    ms.setActionHandler('pause', () => pause());
+    ms.setActionHandler('pause', () => pausePlayback());
     ms.setActionHandler('previoustrack', () => previous());
     ms.setActionHandler('nexttrack', () => next());
     ms.setActionHandler('seekto', (details) => { if (details.seekTime != null) seek(details.seekTime); });
@@ -223,7 +206,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const interval = window.setInterval(() => {
       const remaining = Math.max(0, Math.ceil((sleepTimerEnd - Date.now()) / 60000));
       setSleepTimerState(remaining);
-      if (remaining <= 0) { pause(); setSleepTimerEnd(null); setSleepTimerState(null); }
+      if (remaining <= 0) { pausePlayback(); setSleepTimerEnd(null); setSleepTimerState(null); }
     }, 10000);
     setSleepTimerState(Math.max(0, Math.ceil((sleepTimerEnd - Date.now()) / 60000)));
     return () => clearInterval(interval);
@@ -248,57 +231,11 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     return candidates[Math.floor(Math.random() * candidates.length)].index;
   }, []);
 
-  const resolveAndPlay = useCallback(async (track: Track, audio: HTMLAudioElement) => {
-    setIsBuffering(true);
-    setPlaybackError(null);
-    setState(s => ({ ...s, progress: 0, duration: 0 }));
-
-    // Buffer timeout — show retry after 8s
-    if (bufferTimeoutRef.current) clearTimeout(bufferTimeoutRef.current);
-    bufferTimeoutRef.current = window.setTimeout(() => {
-      setIsBuffering(false);
-      setPlaybackError('Took too long to load. Tap retry.');
-      setState(s => ({ ...s, isPlaying: false }));
-    }, 8000);
-
-    // Unlock audio element synchronously (for mobile gesture context)
-    try { await audio.play().catch(() => {}); } catch {}
-    audio.pause();
-
-    try {
-      let src = track.audio;
-      if (needsStreamResolution(track)) {
-        src = await getStreamUrl(track.id);
-      }
-      if (!src || src.includes('youtube.com/watch')) {
-        throw new Error('Invalid stream URL');
-      }
-      audio.src = src;
-      await audio.play();
-      if (audioContextRef.current?.state === 'suspended') audioContextRef.current.resume();
-    } catch (err: any) {
-      console.warn('[Player] First attempt failed:', err.message);
-      // Auto-retry once
-      try {
-        const src = await getStreamUrl(track.id);
-        if (!src || src.includes('youtube.com/watch')) throw new Error('Invalid stream URL');
-        audio.src = src;
-        await audio.play();
-      } catch (retryErr: any) {
-        console.error('[Player] Playback failed after retry:', retryErr.message);
-        if (bufferTimeoutRef.current) { clearTimeout(bufferTimeoutRef.current); bufferTimeoutRef.current = null; }
-        setIsBuffering(false);
-        setPlaybackError('Could not play this track. Tap retry.');
-        setState(s => ({ ...s, isPlaying: false }));
-      }
-    }
-  }, []);
-
   const handleTrackEnd = useCallback(() => {
     setState(prev => {
       if (prev.repeat === 'one') {
-        audioRef.current!.currentTime = 0;
-        audioRef.current!.play();
+        yt.seekTo(0);
+        yt.play();
         return prev;
       }
       let nextIndex: number;
@@ -312,66 +249,92 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         else return { ...prev, isPlaying: false };
       }
       const nextTrack = prev.queue[nextIndex];
-      if (nextTrack && audioRef.current) {
+      if (nextTrack) {
+        yt.loadVideo(nextTrack.id);
         recentArtistsRef.current = [...recentArtistsRef.current.slice(-4), nextTrack.artist_id];
-        resolveAndPlay(nextTrack, audioRef.current);
         trackPlayListeners.current.forEach(cb => cb(nextTrack));
       }
-      return { ...prev, currentTrack: nextTrack || null, queueIndex: nextIndex, isPlaying: !!nextTrack };
+      return { ...prev, currentTrack: nextTrack || null, queueIndex: nextIndex, isPlaying: !!nextTrack, progress: 0, duration: 0 };
     });
-  }, [getSmartShuffleIndex, resolveAndPlay]);
+  }, [getSmartShuffleIndex, yt]);
+
+  // Stable ref for handleTrackEnd to avoid stale closures
+  const handleTrackEndRef = useRef(handleTrackEnd);
+  handleTrackEndRef.current = handleTrackEnd;
 
   const retryPlayback = useCallback(() => {
-    const track = state.currentTrack;
-    if (track && audioRef.current) {
-      resolveAndPlay(track, audioRef.current);
+    const track = stateRef.current.currentTrack;
+    if (track) {
+      setPlaybackError(null);
+      setIsBuffering(true);
+      yt.loadVideo(track.id);
       setState(s => ({ ...s, isPlaying: true }));
     }
-  }, [state.currentTrack, resolveAndPlay]);
+  }, [yt]);
 
   const play = useCallback((track: Track, queue?: Track[]) => {
     const q = queue || [track];
     const idx = q.findIndex(t => t.id === track.id);
     recentArtistsRef.current = [...recentArtistsRef.current.slice(-4), track.artist_id];
     trackPlayListeners.current.forEach(cb => cb(track));
+    
+    setPlaybackError(null);
+    setIsBuffering(true);
+    
     setState(s => {
       if (s.queue.length > 0) {
         setQueueHistory(h => [...h.slice(-9), { queue: s.queue, queueIndex: s.queueIndex, timestamp: Date.now() }]);
       }
-      return { ...s, currentTrack: track, queue: q, queueIndex: idx >= 0 ? idx : 0, isPlaying: true };
+      return { ...s, currentTrack: track, queue: q, queueIndex: idx >= 0 ? idx : 0, isPlaying: true, progress: 0, duration: 0 };
     });
-    if (audioRef.current) resolveAndPlay(track, audioRef.current);
-    const nextIdx = idx + 1;
-    if (nextIdx < q.length && needsStreamResolution(q[nextIdx])) {
-      preBufferTrack(q[nextIdx].id);
-    }
-  }, [resolveAndPlay]);
 
-  const pause = useCallback(() => { audioRef.current?.pause(); setState(s => ({ ...s, isPlaying: false })); }, []);
+    // Load video by ID — YouTube handles everything
+    yt.loadVideo(track.id);
+  }, [yt]);
+
+  const pausePlayback = useCallback(() => {
+    yt.pause();
+    setState(s => ({ ...s, isPlaying: false }));
+  }, [yt]);
+
   const resume = useCallback(() => {
-    audioRef.current?.play();
-    if (audioContextRef.current?.state === 'suspended') audioContextRef.current.resume();
+    yt.play();
     setState(s => ({ ...s, isPlaying: true }));
-  }, []);
-  const next = useCallback(() => handleTrackEnd(), [handleTrackEnd]);
+  }, [yt]);
+
+  const next = useCallback(() => handleTrackEndRef.current(), []);
 
   const previous = useCallback(() => {
     setState(prev => {
       let prevIndex = prev.queueIndex - 1;
       if (prevIndex < 0) prevIndex = prev.repeat === 'all' ? prev.queue.length - 1 : 0;
       const prevTrack = prev.queue[prevIndex];
-      if (prevTrack && audioRef.current) {
-        resolveAndPlay(prevTrack, audioRef.current);
+      if (prevTrack) {
+        yt.loadVideo(prevTrack.id);
         trackPlayListeners.current.forEach(cb => cb(prevTrack));
       }
-      return { ...prev, currentTrack: prevTrack || null, queueIndex: prevIndex, isPlaying: !!prevTrack };
+      return { ...prev, currentTrack: prevTrack || null, queueIndex: prevIndex, isPlaying: !!prevTrack, progress: 0, duration: 0 };
     });
-  }, [resolveAndPlay]);
+  }, [yt]);
 
-  const seek = useCallback((time: number) => { if (audioRef.current) audioRef.current.currentTime = time; setState(s => ({ ...s, progress: time })); }, []);
-  const setVolume = useCallback((vol: number) => { if (audioRef.current) audioRef.current.volume = vol; localStorage.setItem('ph-volume', String(vol)); setState(s => ({ ...s, volume: vol })); }, []);
-  const toggleShuffle = useCallback(() => { setState(s => { const next = !s.shuffle; localStorage.setItem('ph-shuffle', String(next)); return { ...s, shuffle: next }; }); }, []);
-  const toggleRepeat = useCallback(() => { setState(s => { const modes: RepeatMode[] = ['off', 'all', 'one']; const next = modes[(modes.indexOf(s.repeat) + 1) % 3]; localStorage.setItem('ph-repeat', next); return { ...s, repeat: next }; }); }, []);
+  const seek = useCallback((time: number) => {
+    yt.seekTo(time);
+    setState(s => ({ ...s, progress: time }));
+  }, [yt]);
+
+  const setVolume = useCallback((vol: number) => {
+    yt.setVolume(vol);
+    localStorage.setItem('ph-volume', String(vol));
+    setState(s => ({ ...s, volume: vol }));
+  }, [yt]);
+
+  const toggleShuffle = useCallback(() => {
+    setState(s => { const next = !s.shuffle; localStorage.setItem('ph-shuffle', String(next)); return { ...s, shuffle: next }; });
+  }, []);
+
+  const toggleRepeat = useCallback(() => {
+    setState(s => { const modes: RepeatMode[] = ['off', 'all', 'one']; const next = modes[(modes.indexOf(s.repeat) + 1) % 3]; localStorage.setItem('ph-repeat', next); return { ...s, repeat: next }; });
+  }, []);
 
   const addToQueue = useCallback((track: Track) => { setState(s => ({ ...s, queue: [...s.queue, track] })); }, []);
   const playNext = useCallback((track: Track) => { setState(s => { const nq = [...s.queue]; nq.splice(s.queueIndex + 1, 0, track); return { ...s, queue: nq }; }); }, []);
@@ -394,20 +357,20 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   // Keyboard
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.code === 'Space' && e.target === document.body) { e.preventDefault(); state.isPlaying ? pause() : resume(); }
+      if (e.code === 'Space' && e.target === document.body) { e.preventDefault(); stateRef.current.isPlaying ? pausePlayback() : resume(); }
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [state.isPlaying, pause, resume]);
+  }, [pausePlayback, resume]);
 
   return (
     <PlayerContext.Provider value={{
-      ...state, play, pause, resume, next, previous, seek, setVolume,
+      ...state, play, pause: pausePlayback, resume, next, previous, seek, setVolume,
       toggleShuffle, toggleRepeat, addToQueue, playNext, removeFromQueue, reorderQueue, clearQueue, queueHistory, onTrackPlay,
       crossfadeDuration, setCrossfadeDuration,
       sleepTimer, setSleepTimer, sleepTimerEnd,
       volumeNormalization, setVolumeNormalization,
-      analyserNode: analyserRef.current,
+      analyserNode: null,
       visualizerEnabled, setVisualizerEnabled,
       workoutMode, setWorkoutMode, targetBPM, setTargetBPM,
       isBuffering, playbackError, retryPlayback,

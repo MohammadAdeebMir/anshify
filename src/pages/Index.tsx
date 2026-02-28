@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTheme } from '@/contexts/ThemeContext';
+import { AppBackground } from '@/components/AppBackground';
 import { TrendingUp, Music2, Sparkles, Clock, Users, Headphones, Zap } from 'lucide-react';
 import { getTrendingYT, getNewReleasesYT, searchYTMusic } from '@/services/ytmusic';
 import { usePlayer } from '@/contexts/PlayerContext';
@@ -178,33 +179,7 @@ const Index = () => {
 
   return (
     <div className="max-w-5xl mx-auto pb-36">
-      {/* ── Subtle ambient background gradients ── */}
-      {theme !== 'oled' && (
-        <div className="fixed inset-0 pointer-events-none" style={{ zIndex: 0 }}>
-          <div className="absolute inset-0 bg-black" />
-          {/* Blue corners */}
-          <div
-            className="absolute inset-0 animate-[glow-pulse_8s_ease-in-out_infinite]"
-            style={{
-              background: `
-                radial-gradient(ellipse 65% 55% at 0% 0%, hsl(210 100% 55% / 0.40) 0%, transparent 60%),
-                radial-gradient(ellipse 55% 50% at 100% 0%, hsl(215 100% 58% / 0.35) 0%, transparent 55%),
-                radial-gradient(ellipse 60% 55% at 100% 100%, hsl(210 100% 55% / 0.38) 0%, transparent 55%),
-                radial-gradient(ellipse 55% 50% at 0% 100%, hsl(205 95% 58% / 0.32) 0%, transparent 55%)
-              `,
-            }}
-          />
-          {/* Golden center */}
-          <div
-            className="absolute inset-0 animate-[glow-pulse_10s_ease-in-out_2s_infinite]"
-            style={{
-              background: `
-                radial-gradient(ellipse 75% 60% at 50% 45%, hsl(42 95% 55% / 0.35) 0%, hsl(38 90% 50% / 0.15) 35%, transparent 65%)
-              `,
-            }}
-          />
-        </div>
-      )}
+      {theme !== 'oled' && <AppBackground theme={theme} />}
 
       <div className="relative" style={{ zIndex: 1 }}>
         {/* ── Top Bar: Profile + Filter Pills ── */}

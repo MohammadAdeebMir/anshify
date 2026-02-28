@@ -8,6 +8,7 @@ import { useIsOnline } from '@/hooks/useOffline';
 import { Track } from '@/types/music';
 import { YTSearchResults } from '@/components/search/YTSearchResults';
 import { cn } from '@/lib/utils';
+import { AppBackground } from '@/components/AppBackground';
 import { useAuth } from '@/hooks/useAuth';
 import { useTheme } from '@/contexts/ThemeContext';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -251,24 +252,7 @@ const GenreCarousel = memo(({ genre }: { genre: typeof GENRE_SECTIONS[0] }) => {
 GenreCarousel.displayName = 'GenreCarousel';
 
 /* ─── Background matching themes ───────────────────────────────── */
-const SearchBackground = memo(({ theme }: { theme: string }) => {
-  if (theme === 'oled') return <div className="fixed inset-0 bg-black -z-10" />;
-  if (theme === 'obsidian') return (
-    <div className="fixed inset-0 -z-10" style={{
-      background: 'radial-gradient(ellipse 70% 50% at 50% 30%, rgba(100,120,160,0.04), transparent 60%), #0b0b0f',
-    }} />
-  );
-  return (
-    <div className="fixed inset-0 -z-10" style={{
-      background: `
-        radial-gradient(ellipse 60% 45% at 30% 20%, rgba(180,140,80,0.045), transparent 55%),
-        radial-gradient(ellipse 50% 40% at 70% 60%, rgba(160,120,60,0.03), transparent 50%),
-        linear-gradient(180deg, #0e0e11 0%, #121216 100%)
-      `,
-    }} />
-  );
-});
-SearchBackground.displayName = 'SearchBackground';
+// Now uses shared AppBackground component
 
 /* ─── Main SearchPage ──────────────────────────────────────────── */
 const SearchPage = () => {
@@ -358,7 +342,7 @@ const SearchPage = () => {
 
   return (
     <>
-      <SearchBackground theme={theme} />
+      <AppBackground theme={theme} />
 
       <div className="relative min-h-screen pb-32">
         {/* Sticky Header */}

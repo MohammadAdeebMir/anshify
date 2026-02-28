@@ -68,10 +68,34 @@ const SettingsPage = () => {
   }
 
   const handleSaveProfile = async () => {
+    const trimmedName = displayName.trim();
+    const trimmedAvatar = avatarUrl.trim();
+
+    if (trimmedName && trimmedName.length > 50) {
+      toast.error('Display name must be 50 characters or less');
+      return;
+    }
+    if (trimmedAvatar) {
+      if (trimmedAvatar.length > 500) {
+        toast.error('Avatar URL must be 500 characters or less');
+        return;
+      }
+      try {
+        const url = new URL(trimmedAvatar);
+        if (!['http:', 'https:'].includes(url.protocol)) {
+          toast.error('Avatar URL must be an HTTP or HTTPS URL');
+          return;
+        }
+      } catch {
+        toast.error('Avatar URL must be a valid URL');
+        return;
+      }
+    }
+
     setSaving(true);
     const { error } = await supabase
       .from('profiles')
-      .update({ display_name: displayName.trim() || null, avatar_url: avatarUrl.trim() || null })
+      .update({ display_name: trimmedName || null, avatar_url: trimmedAvatar || null })
       .eq('user_id', user.id);
     if (error) toast.error(error.message);
     else toast.success('Profile updated');

@@ -499,10 +499,10 @@ export const PlayerBar = () => {
               <AnimatePresence mode="wait">
                 <motion.div
                   key={currentTrack.id}
-                  initial={{ scale: 0.92, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  exit={{ scale: 0.94, opacity: 0 }}
-                  transition={{ duration: 0.35, ease: [0.25, 0.1, 0.25, 1] }}
+                  initial={{ scale: 0.92, opacity: 0, filter: 'blur(12px)' }}
+                  animate={{ scale: 1, opacity: 1, filter: 'blur(0px)' }}
+                  exit={{ scale: 0.94, opacity: 0, filter: 'blur(8px)' }}
+                  transition={{ duration: 0.4, ease: [0.25, 0.1, 0.25, 1] }}
                   className="w-full h-full"
                 >
                   {/* Ambient glow behind artwork */}
@@ -610,7 +610,7 @@ export const PlayerBar = () => {
                   shuffle ? 'text-white' : 'text-white/40'
                 )}>
                 <Shuffle className="h-[20px] w-[20px]" />
-                {shuffle && <span className="absolute bottom-1.5 w-1 h-1 rounded-full bg-white" />}
+                {shuffle && <motion.span initial={{ scale: 0 }} animate={{ scale: [1, 1.5, 1] }} transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut' }} className="absolute bottom-1.5 w-1 h-1 rounded-full bg-white" />}
               </motion.button>
 
               <motion.button
@@ -643,7 +643,7 @@ export const PlayerBar = () => {
                   repeat !== 'off' ? 'text-white' : 'text-white/40'
                 )}>
                 {repeat === 'one' ? <Repeat1 className="h-[20px] w-[20px]" /> : <Repeat className="h-[20px] w-[20px]" />}
-                {repeat !== 'off' && <span className="absolute bottom-1.5 w-1 h-1 rounded-full bg-white" />}
+                {repeat !== 'off' && <motion.span initial={{ scale: 0 }} animate={{ scale: [1, 1.5, 1] }} transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut' }} className="absolute bottom-1.5 w-1 h-1 rounded-full bg-white" />}
               </motion.button>
             </div>
 

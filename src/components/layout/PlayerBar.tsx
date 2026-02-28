@@ -377,15 +377,15 @@ export const PlayerBar = () => {
   const liked = isLiked(currentTrack.id, likedSongs);
   const upcomingCount = queue.length - queueIndex - 1;
 
-  // Dynamic gradient — Spotify-style soft vertical blend
+  // Dynamic gradient — Spotify-style bold vertical blend (fully opaque)
   const { r: cr, g: cg, b: cb, sr, sg, sb } = dominantColor;
-  const accentGlow = `rgba(${cr},${cg},${cb},0.35)`;
+  const accentGlow = `rgba(${cr},${cg},${cb},0.4)`;
   const bgGradient = `
     linear-gradient(180deg,
-      rgba(${cr},${cg},${cb},0.85) 0%,
-      rgba(${Math.round(cr*0.6)},${Math.round(cg*0.6)},${Math.round(cb*0.6)},0.7) 35%,
-      rgba(${sr},${sg},${sb},0.5) 70%,
-      rgba(8,8,10,0.98) 100%
+      rgb(${cr},${cg},${cb}) 0%,
+      rgb(${Math.round(cr*0.55)},${Math.round(cg*0.55)},${Math.round(cb*0.55)}) 40%,
+      rgb(${sr},${sg},${sb}) 70%,
+      rgb(10,10,12) 100%
     )
   `;
 
@@ -439,18 +439,20 @@ export const PlayerBar = () => {
           exit={{ y: '100%' }}
           transition={{ type: 'spring', damping: 30, stiffness: 280 }}
           className="fixed inset-0 z-50 flex flex-col overflow-hidden"
+          style={{ backgroundColor: '#0a0a0c' }}
         >
-          {/* Animated background */}
+          {/* Animated background — fully opaque, no transparency leak */}
           <div
-            className="absolute inset-0 -z-10"
-            style={{ background: bgGradient, transition: 'background 450ms ease' }}
+            className="absolute inset-0"
+            style={{ background: bgGradient, transition: 'background 450ms ease', zIndex: 0 }}
           />
           {/* Dark overlay for readability */}
-          <div className="absolute inset-0 -z-10 bg-black/[0.15]" />
+          <div className="absolute inset-0 bg-black/[0.18]" style={{ zIndex: 0 }} />
 
           {/* Drag-down-to-close overlay */}
           <motion.div
-            className="absolute inset-0 z-0"
+            className="absolute inset-0"
+            style={{ zIndex: 1 }}
             drag="y"
             dragConstraints={{ top: 0, bottom: 0 }}
             dragElastic={0.3}
@@ -458,8 +460,8 @@ export const PlayerBar = () => {
           />
 
           {/* Top bar */}
-          <div className="flex items-center justify-between px-6 relative z-10"
-            style={{ paddingTop: 'max(env(safe-area-inset-top, 12px), 16px)', paddingBottom: '8px' }}>
+          <div className="flex items-center justify-between px-6 relative"
+            style={{ zIndex: 2, paddingTop: 'max(env(safe-area-inset-top, 12px), 16px)', paddingBottom: '8px' }}>
             <motion.button whileTap={{ scale: 0.88, opacity: 0.5 }} onClick={() => setExpanded(false)}
               className="min-w-[44px] min-h-[44px] flex items-center justify-center -ml-2 text-white/50">
               <ChevronDown className="h-7 w-7" />
@@ -477,7 +479,7 @@ export const PlayerBar = () => {
           </div>
 
           {/* Album art — large, centered */}
-          <div className="flex-1 flex items-center justify-center px-8 relative z-10 min-h-0">
+          <div className="flex-1 flex items-center justify-center px-8 relative min-h-0" style={{ zIndex: 2 }}>
             <motion.div
               drag="x"
               dragConstraints={{ left: 0, right: 0 }}
@@ -544,7 +546,7 @@ export const PlayerBar = () => {
           </div>
 
           {/* Track info + controls */}
-          <div className="px-8 relative z-10 pb-2" style={{ paddingBottom: 'max(env(safe-area-inset-bottom, 12px), 20px)' }}>
+          <div className="px-8 relative pb-2" style={{ zIndex: 2, paddingBottom: 'max(env(safe-area-inset-bottom, 12px), 20px)' }}>
             {/* Song info row with like */}
             <AnimatePresence mode="wait">
               <motion.div
@@ -557,7 +559,7 @@ export const PlayerBar = () => {
               >
                 <div className="min-w-0 flex-1 mr-4">
                   <MarqueeText text={currentTrack.name} className="text-xl font-bold text-white tracking-tight leading-tight" />
-                  <p className="text-[15px] text-white/50 truncate mt-0.5 font-normal">{currentTrack.artist_name}</p>
+                  <MarqueeText text={currentTrack.artist_name} className="text-[15px] text-amber-300/70 mt-0.5 font-normal" />
                 </div>
                 {user && (
                   <motion.button
@@ -639,9 +641,9 @@ export const PlayerBar = () => {
       >
         <div className="absolute inset-0"
           style={{
-            background: `linear-gradient(180deg, rgba(${cr},${cg},${cb},0.15) 0%, hsl(0 0% 3% / 0.97) 100%)`,
+            background: `linear-gradient(180deg, rgba(${cr},${cg},${cb},0.2) 0%, rgb(8,8,8) 100%)`,
             backdropFilter: 'blur(40px)', WebkitBackdropFilter: 'blur(40px)',
-            borderTop: '1px solid rgba(255,255,255,0.05)',
+            borderTop: '1px solid rgba(255,255,255,0.06)',
             transition: 'background 400ms ease',
           }}
         />
@@ -675,7 +677,7 @@ export const PlayerBar = () => {
             </motion.div>
             <div className="min-w-0">
               <MarqueeText text={currentTrack.name} className="text-[13px] font-semibold text-white tracking-tight" />
-              <p className="text-[11px] truncate text-white/35 mt-0.5">{currentTrack.artist_name}</p>
+              <MarqueeText text={currentTrack.artist_name} className="text-[11px] text-amber-300/60 mt-0.5" />
             </div>
           </button>
 

@@ -32,21 +32,22 @@ function rgbToHsl(r: number, g: number, b: number): [number, number, number] {
   return [Math.round(h * 360), Math.round(s * 100), Math.round(l * 100)];
 }
 
-/** Clamp lightness: auto-darken brights, slightly boost dull colors */
+/** Clamp lightness: produce bold Spotify-style tones */
 function adjustColor(r: number, g: number, b: number): [number, number, number] {
   const [h, s, l] = rgbToHsl(r, g, b);
-  // Target lightness: 25-45 range — deep but not black
+  // Target lightness: 30-50 range — rich and visible, not muddy
   let adjL = l;
-  if (l > 55) adjL = 25 + (l - 55) * 0.3; // darken bright
-  else if (l < 15) adjL = 15 + l * 0.5; // lift too-dark
-  else adjL = Math.max(20, Math.min(45, l));
+  if (l > 60) adjL = 30 + (l - 60) * 0.25;
+  else if (l < 20) adjL = 20 + l * 0.6; // lift too-dark more aggressively
+  else adjL = Math.max(28, Math.min(50, l));
 
-  // Boost dull saturation slightly, reduce oversaturation
+  // Boost saturation more aggressively for vivid colors
   let adjS = s;
-  if (s < 20) adjS = s + 15; // boost dull
-  else if (s > 80) adjS = 60 + (s - 80) * 0.3; // tame neon
+  if (s < 30) adjS = s + 25; // boost dull significantly
+  else if (s > 85) adjS = 65 + (s - 85) * 0.3; // tame neon
+  else adjS = Math.max(s, 40); // ensure minimum vibrancy
 
-  return hslToRgb(h, Math.min(adjS, 70), adjL);
+  return hslToRgb(h, Math.min(adjS, 75), adjL);
 }
 
 function hslToRgb(h: number, s: number, l: number): [number, number, number] {
@@ -116,7 +117,7 @@ function extractColor(img: HTMLImageElement): DominantColor {
   const [ar, ag, ab] = adjustColor(pr, pg, pb);
   const [h, s, l] = rgbToHsl(ar, ag, ab);
 
-  let sr = Math.round(ar * 0.4), sg = Math.round(ag * 0.4), sb = Math.round(ab * 0.4);
+  let sr = Math.round(ar * 0.55), sg = Math.round(ag * 0.55), sb = Math.round(ab * 0.55);
   if (buckets[1].count > 0) {
     const sec = buckets[1];
     const raw = adjustColor(
@@ -124,9 +125,9 @@ function extractColor(img: HTMLImageElement): DominantColor {
       Math.round(sec.gSum / sec.count),
       Math.round(sec.bSum / sec.count),
     );
-    sr = Math.round(raw[0] * 0.5);
-    sg = Math.round(raw[1] * 0.5);
-    sb = Math.round(raw[2] * 0.5);
+    sr = Math.round(raw[0] * 0.65);
+    sg = Math.round(raw[1] * 0.65);
+    sb = Math.round(raw[2] * 0.65);
   }
 
   return { r: ar, g: ag, b: ab, h, s, l, sr, sg, sb };

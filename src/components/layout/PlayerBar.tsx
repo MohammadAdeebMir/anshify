@@ -331,6 +331,7 @@ export const PlayerBar = () => {
   const [queueOpen, setQueueOpen] = useState(false);
   const [lyricsOpen, setLyricsOpen] = useState(false);
   const [showHeartBurst, setShowHeartBurst] = useState(false);
+  const [miniDragY, setMiniDragY] = useState(0);
   const lastTapRef = useRef(0);
   const dominantColor = useDominantColor(player.currentTrack?.album_image);
 
@@ -692,15 +693,23 @@ export const PlayerBar = () => {
       <QueuePanel open={queueOpen} onClose={() => setQueueOpen(false)} />
       <motion.div
         initial={{ y: 100, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        exit={{ y: 100, opacity: 0 }}
-        transition={{ type: 'spring', damping: 28, stiffness: 260 }}
+        animate={{ y: 0, opacity: 1, scale: 1 }}
+        exit={{ y: 120, opacity: 0, scale: 0.95 }}
+        transition={{ type: 'spring', damping: 26, stiffness: 240 }}
         className={cn('fixed z-30', isMobile ? 'bottom-16 left-2 right-2' : 'bottom-2 left-3 right-3')}
+        style={{
+          opacity: miniDragY > 0 ? Math.max(0.2, 1 - miniDragY / 180) : 1,
+          scale: miniDragY > 0 ? Math.max(0.92, 1 - miniDragY / 800) : 1,
+        }}
         drag="y"
-        dragConstraints={{ top: 0, bottom: 0 }}
-        dragElastic={0.3}
+        dragConstraints={{ top: -6, bottom: 0 }}
+        dragElastic={{ top: 0.08, bottom: 0.6 }}
+        dragMomentum={false}
+        dragTransition={{ bounceStiffness: 400, bounceDamping: 30 }}
+        onDrag={(_, info) => setMiniDragY(Math.max(0, info.offset.y))}
         onDragEnd={(_, info) => {
-          if (info.offset.y > 60 || info.velocity.y > 300) {
+          setMiniDragY(0);
+          if (info.offset.y > 45 || info.velocity.y > 180) {
             player.dismissPlayer();
           }
         }}

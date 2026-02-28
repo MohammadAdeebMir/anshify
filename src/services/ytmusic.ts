@@ -1,4 +1,5 @@
 import { Track } from '@/types/music';
+import { supabase } from '@/integrations/supabase/client';
 
 // Use the music-proxy edge function to bypass CORS
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
@@ -9,9 +10,11 @@ function getProxyUrl(endpoint: string, params: Record<string, string>): string {
   return `${SUPABASE_URL}/functions/v1/music-proxy?${searchParams.toString()}`;
 }
 
-function getProxyHeaders(): Record<string, string> {
+async function getProxyHeaders(): Promise<Record<string, string>> {
+  const { data: { session } } = await supabase.auth.getSession();
+  const token = session?.access_token || SUPABASE_KEY;
   return {
-    'Authorization': `Bearer ${SUPABASE_KEY}`,
+    'Authorization': `Bearer ${token}`,
     'apikey': SUPABASE_KEY,
   };
 }
@@ -115,8 +118,9 @@ export async function searchYTMusic(query: string, limit = 20, cancelPrevious = 
     const url = getProxyUrl('search', { q: query });
     console.log('[ytmusic] Search URL:', url);
 
+    const headers = await getProxyHeaders();
     const res = await fetchWithRetry(url, {
-      headers: getProxyHeaders(),
+      headers,
       ...(signal ? { signal } : {}),
     }, 12000);
     if (!res.ok) throw new Error(`Search failed: ${res.status}`);
@@ -150,7 +154,8 @@ export async function getStreamUrl(videoId: string): Promise<string> {
       const url = getProxyUrl('stream', { videoId });
       console.log('[ytmusic] Stream request:', url);
 
-      const res = await fetchWithRetry(url, { headers: getProxyHeaders() }, 15000);
+      const headers = await getProxyHeaders();
+      const res = await fetchWithRetry(url, { headers }, 15000);
       if (!res.ok) throw new Error(`Stream failed: ${res.status}`);
 
       const data = await res.json();

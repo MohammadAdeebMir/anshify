@@ -15,22 +15,6 @@ Deno.serve(async (req) => {
     const body = await req.json();
     const { username, password, action, notificationTitle, notificationBody, notificationImage, notificationId } = body;
 
-    // ── Primary auth: verify credentials ──
-    const adminUser = Deno.env.get("ADMIN_USERNAME");
-    const adminPass = Deno.env.get("ADMIN_PASSWORD");
-
-    if (!adminUser || !adminPass) {
-      return new Response(JSON.stringify({ error: "Admin not configured" }), {
-        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    if (username !== adminUser || password !== adminPass) {
-      return new Response(JSON.stringify({ error: "Invalid credentials" }), {
-        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
     // ── Mandatory auth: check JWT + admin role in DB ──
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
@@ -68,6 +52,25 @@ Deno.serve(async (req) => {
     if (!roleData) {
       return new Response(JSON.stringify({ error: "Admin role required" }), {
         status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // ── Optional: verify admin credentials on login action ──
+    if (action === "login") {
+      const adminUser = Deno.env.get("ADMIN_USERNAME");
+      const adminPass = Deno.env.get("ADMIN_PASSWORD");
+      if (!adminUser || !adminPass) {
+        return new Response(JSON.stringify({ error: "Admin not configured" }), {
+          status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      if (username !== adminUser || password !== adminPass) {
+        return new Response(JSON.stringify({ error: "Invalid credentials" }), {
+          status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      return new Response(JSON.stringify({ success: true }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 

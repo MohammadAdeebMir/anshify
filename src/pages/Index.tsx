@@ -23,6 +23,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { NotificationBell } from '@/components/NotificationBell';
 import { useNavigate } from 'react-router-dom';
 import appLogo from '@/assets/logo.png';
+import { ProfilePanel } from '@/components/ProfilePanel';
 
 /* ─── Filter Pills ─────────────────────────────────────────────── */
 const FILTERS = ['All', 'Music'] as const;
@@ -150,6 +151,7 @@ const Index = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [filter, setFilter] = useState<Filter>('All');
+  const [profileOpen, setProfileOpen] = useState(false);
   const { recentlyPlayed, isLoading: loadingRecent } = useRecentlyPlayed();
   const { data: trending, isLoading: loadingTrending } = useQuery({
     queryKey: ['trending-yt'], queryFn: () => getTrendingYT(16), staleTime: 5 * 60 * 1000,
@@ -183,6 +185,7 @@ const Index = () => {
 
   return (
     <div className="max-w-5xl mx-auto pb-36">
+      <ProfilePanel open={profileOpen} onClose={() => setProfileOpen(false)} />
       {theme !== 'oled' && <AppBackground theme={theme} />}
 
       <div className="relative" style={{ zIndex: 1 }}>
@@ -209,7 +212,7 @@ const Index = () => {
             <div className="flex items-center gap-1">
               <NotificationBell />
               <button
-                onClick={() => navigate('/profile')}
+                onClick={() => setProfileOpen(true)}
                 className="p-1"
               >
                 <Avatar className="h-[34px] w-[34px] ring-1 ring-border/20">

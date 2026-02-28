@@ -27,6 +27,9 @@ import SecretAdminPage from "./pages/SecretAdminPage";
 import AdminNotifyPage from "./pages/AdminNotifyPage";
 import NotFound from "./pages/NotFound";
 import InstallPage from "./pages/InstallPage";
+import InsightsPage from "./pages/InsightsPage";
+import CreatePage from "./pages/CreatePage";
+import RecentsPage from "./pages/RecentsPage";
 
 const queryClient = new QueryClient();
 
@@ -55,6 +58,9 @@ const App = () => (
                 <Route path="/analytics" element={<AnalyticsPage />} />
                 <Route path="/storage" element={<StoragePage />} />
                 <Route path="/queue" element={<QueuePage />} />
+                <Route path="/insights" element={<InsightsPage />} />
+                <Route path="/create" element={<CreatePage />} />
+                <Route path="/recents" element={<RecentsPage />} />
               </Route>
               <Route path="/auth" element={<AuthPage />} />
               <Route path="/reset-password" element={<ResetPasswordPage />} />

@@ -9,15 +9,17 @@ import { AddToPlaylistButton } from '@/components/AddToPlaylistButton';
 import { useOfflineTracks } from '@/hooks/useOffline';
 import { cn } from '@/lib/utils';
 import { SongListSkeleton } from '@/components/skeletons/Skeletons';
+import { useHDArtwork } from '@/hooks/useHDArtwork';
 
-// Crossfade image loader
-const ImgFade = ({ src, alt }: { src: string; alt: string }) => {
+// Crossfade image loader with HD artwork
+const ImgFade = ({ src, alt, trackId }: { src: string; alt: string; trackId?: string }) => {
   const [loaded, setLoaded] = useState(false);
+  const hdSrc = useHDArtwork(trackId, src);
   return (
     <>
       {!loaded && <div className="absolute inset-0 bg-muted animate-pulse" />}
       <img
-        src={src}
+        src={hdSrc}
         alt={alt}
         onLoad={() => setLoaded(true)}
         className={`h-full w-full object-cover transition-opacity duration-400 ${loaded ? 'opacity-100' : 'opacity-0'}`}
@@ -52,7 +54,7 @@ const YTTrackRow = ({ track, tracks, index }: { track: Track; tracks: Track[]; i
       <button onClick={() => play(track, tracks)} className="flex items-center gap-3 flex-1 min-w-0 text-left group">
         <div className="relative h-12 w-12 rounded-xl overflow-hidden flex-shrink-0 shadow-lg">
           {track.album_image ? (
-            <ImgFade src={track.album_image} alt={track.album_name} />
+            <ImgFade src={track.album_image} alt={track.album_name} trackId={track.id} />
           ) : (
             <div className="h-full w-full bg-muted flex items-center justify-center">
               <Play className="h-4 w-4 text-muted-foreground" />

@@ -385,22 +385,19 @@ const SearchPage = () => {
                 'relative flex items-center gap-3 h-[52px] px-4 rounded-2xl',
                 'transition-all duration-300',
                 isFocused
-                  ? 'shadow-lg shadow-white/10'
-                  : 'shadow-md shadow-white/[0.04]',
+                  ? 'shadow-[0_0_20px_rgba(255,255,255,0.12)]'
+                  : 'shadow-[0_0_10px_rgba(255,255,255,0.05)]',
               )}
               style={{
                 background: isFocused
-                  ? 'linear-gradient(135deg, hsl(0 0% 28%), hsl(0 0% 24%))'
-                  : 'linear-gradient(135deg, hsl(0 0% 24%), hsl(0 0% 20%))',
+                  ? 'hsl(0 0% 92%)'
+                  : 'hsl(0 0% 85%)',
                 border: isFocused
-                  ? '1px solid hsl(0 0% 45% / 0.7)'
-                  : '1px solid hsl(0 0% 35% / 0.5)',
+                  ? '1px solid hsl(0 0% 100% / 0.6)'
+                  : '1px solid hsl(0 0% 70% / 0.3)',
               }}
               >
-                <Search className={cn(
-                  'h-[18px] w-[18px] flex-shrink-0 transition-colors duration-200',
-                  isFocused ? 'text-foreground' : 'text-secondary-foreground',
-                )} />
+                <Search className="h-[18px] w-[18px] flex-shrink-0 text-black/50" />
                 <input
                   ref={inputRef}
                   value={query}
@@ -408,17 +405,14 @@ const SearchPage = () => {
                   onFocus={() => setIsFocused(true)}
                   onBlur={() => setIsFocused(false)}
                   placeholder="Search songs, artists, albums…"
-                  className={cn(
-                    'flex-1 bg-transparent text-[15px] font-medium text-foreground',
-                    'placeholder:text-muted-foreground/70 outline-none',
-                  )}
+                  className="flex-1 bg-transparent text-[15px] font-medium text-black placeholder:text-black/40 outline-none"
                 />
                 {query && (
                   <button
                     onClick={() => { setQuery(''); setDebouncedQuery(''); inputRef.current?.focus(); }}
-                    className="p-1.5 rounded-full hover:bg-muted/50 transition-colors"
+                    className="p-1.5 rounded-full hover:bg-black/10 transition-colors"
                   >
-                    <X className="h-4 w-4 text-muted-foreground" />
+                    <X className="h-4 w-4 text-black/40" />
                   </button>
                 )}
               </div>

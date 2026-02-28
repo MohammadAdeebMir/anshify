@@ -33,7 +33,7 @@ export const TrackCard = ({ track, tracks, index = 0 }: TrackCardProps) => {
       onClick={handleClick}
       className="group snap-start flex-shrink-0 w-[152px] sm:w-[172px] text-left"
     >
-      <div className="relative aspect-square rounded-xl overflow-hidden mb-2.5 shadow-lg shadow-black/30">
+      <div className="relative aspect-square rounded-sm overflow-hidden mb-2.5 shadow-lg shadow-black/30">
         {!imgLoaded && (
           <div className="absolute inset-0 bg-secondary animate-pulse" />
         )}

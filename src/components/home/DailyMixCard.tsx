@@ -21,7 +21,7 @@ export const DailyMixCard = ({ mix, index }: DailyMixCardProps) => {
     <button
       onClick={() => mix.tracks.length > 0 && play(mix.tracks[0], mix.tracks)}
       className={cn(
-        'group relative rounded-2xl overflow-hidden text-left aspect-square sm:aspect-[4/3]',
+        'group relative rounded-sm overflow-hidden text-left aspect-square sm:aspect-[4/3]',
         'bg-gradient-to-br transition-transform duration-300 hover:scale-[1.03]',
         gradients[index % 3]
       )}

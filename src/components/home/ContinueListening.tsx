@@ -40,7 +40,7 @@ const ContinueCard = ({
       className="group snap-start flex-shrink-0 w-[148px] sm:w-[168px] text-left"
     >
       <div className={cn(
-        'relative aspect-square rounded-2xl overflow-hidden mb-2.5 shadow-lg shadow-black/50',
+        'relative aspect-square rounded-sm overflow-hidden mb-2.5 shadow-lg shadow-black/50',
         isActive && 'ring-2 ring-primary/60 ring-offset-2 ring-offset-background'
       )}>
         {/* Shimmer placeholder */}

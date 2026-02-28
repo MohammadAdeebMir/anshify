@@ -383,13 +383,23 @@ const SearchPage = () => {
               )}
               <div className={cn(
                 'relative flex items-center gap-3 h-[52px] px-4 rounded-2xl',
-                'glass-strong',
                 'transition-all duration-300',
-                isFocused && 'shadow-lg shadow-black/30',
-              )}>
+                isFocused
+                  ? 'shadow-lg shadow-white/5'
+                  : 'shadow-md shadow-black/20',
+              )}
+              style={{
+                background: isFocused
+                  ? 'linear-gradient(135deg, hsl(0 0% 22%), hsl(0 0% 18%))'
+                  : 'linear-gradient(135deg, hsl(0 0% 18%), hsl(0 0% 14%))',
+                border: isFocused
+                  ? '1px solid hsl(0 0% 35% / 0.6)'
+                  : '1px solid hsl(0 0% 25% / 0.4)',
+              }}
+              >
                 <Search className={cn(
                   'h-[18px] w-[18px] flex-shrink-0 transition-colors duration-200',
-                  isFocused ? 'text-foreground' : 'text-muted-foreground',
+                  isFocused ? 'text-foreground' : 'text-secondary-foreground',
                 )} />
                 <input
                   ref={inputRef}
@@ -400,7 +410,7 @@ const SearchPage = () => {
                   placeholder="Search songs, artists, albums…"
                   className={cn(
                     'flex-1 bg-transparent text-[15px] font-medium text-foreground',
-                    'placeholder:text-muted-foreground/50 outline-none',
+                    'placeholder:text-muted-foreground/70 outline-none',
                   )}
                 />
                 {query && (

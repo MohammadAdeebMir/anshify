@@ -25,7 +25,7 @@ export const DailyMixCard = ({ mix, index }: DailyMixCardProps) => {
         'bg-gradient-to-br transition-transform duration-300 hover:scale-[1.03]',
         gradients[index % 3]
       )}
-      style={{ borderRadius: '1px' }}
+      style={{ borderRadius: '3px' }}
     >
       {/* Subtle grid overlay for texture */}
       <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />

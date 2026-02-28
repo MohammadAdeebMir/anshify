@@ -42,7 +42,7 @@ const ContinueCard = ({
       <div className={cn(
         'relative aspect-square overflow-hidden mb-2.5 shadow-lg shadow-black/50',
         isActive && 'ring-2 ring-primary/60 ring-offset-2 ring-offset-background'
-      )} style={{ borderRadius: '1px' }}>
+      )} style={{ borderRadius: '3px' }}>
         {/* Shimmer placeholder */}
         {!imgLoaded && (
           <div className="absolute inset-0 bg-muted animate-pulse" />

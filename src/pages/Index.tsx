@@ -182,14 +182,17 @@ const Index = () => {
       {theme !== 'oled' && (
         <div className="fixed inset-0 pointer-events-none" style={{ zIndex: 0 }}>
           <div
-            className="absolute inset-0 transition-all duration-[600ms]"
+            className="absolute inset-0"
             style={{
               background: theme === 'obsidian'
-                ? 'radial-gradient(ellipse at 20% 10%, hsl(210 80% 50% / 0.06) 0%, transparent 50%), radial-gradient(ellipse at 80% 85%, hsl(40 70% 50% / 0.05) 0%, transparent 50%)'
-                : `radial-gradient(ellipse at 15% 8%, hsl(40 75% 55% / 0.07) 0%, transparent 45%),
-                   radial-gradient(ellipse at 85% 15%, hsl(210 90% 55% / 0.06) 0%, transparent 45%),
-                   radial-gradient(ellipse at 50% 90%, hsl(35 65% 50% / 0.04) 0%, transparent 40%),
-                   radial-gradient(ellipse at 70% 60%, hsl(200 80% 50% / 0.03) 0%, transparent 40%)`,
+                ? `radial-gradient(ellipse 80% 60% at 15% 5%, hsl(210 90% 45% / 0.12) 0%, transparent 50%),
+                   radial-gradient(ellipse 70% 50% at 85% 90%, hsl(40 80% 50% / 0.10) 0%, transparent 50%),
+                   #000`
+                : `radial-gradient(ellipse 80% 55% at 10% 5%, hsl(210 100% 50% / 0.14) 0%, transparent 50%),
+                   radial-gradient(ellipse 60% 45% at 90% 10%, hsl(200 85% 55% / 0.08) 0%, transparent 45%),
+                   radial-gradient(ellipse 70% 50% at 85% 85%, hsl(40 85% 50% / 0.12) 0%, transparent 50%),
+                   radial-gradient(ellipse 50% 40% at 20% 80%, hsl(35 75% 45% / 0.07) 0%, transparent 45%),
+                   #000`,
             }}
           />
         </div>

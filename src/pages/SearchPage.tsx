@@ -385,16 +385,16 @@ const SearchPage = () => {
                 'relative flex items-center gap-3 h-[52px] px-4 rounded-2xl',
                 'transition-all duration-300',
                 isFocused
-                  ? 'shadow-lg shadow-white/5'
-                  : 'shadow-md shadow-black/20',
+                  ? 'shadow-lg shadow-white/10'
+                  : 'shadow-md shadow-white/[0.04]',
               )}
               style={{
                 background: isFocused
-                  ? 'linear-gradient(135deg, hsl(0 0% 22%), hsl(0 0% 18%))'
-                  : 'linear-gradient(135deg, hsl(0 0% 18%), hsl(0 0% 14%))',
+                  ? 'linear-gradient(135deg, hsl(0 0% 28%), hsl(0 0% 24%))'
+                  : 'linear-gradient(135deg, hsl(0 0% 24%), hsl(0 0% 20%))',
                 border: isFocused
-                  ? '1px solid hsl(0 0% 35% / 0.6)'
-                  : '1px solid hsl(0 0% 25% / 0.4)',
+                  ? '1px solid hsl(0 0% 45% / 0.7)'
+                  : '1px solid hsl(0 0% 35% / 0.5)',
               }}
               >
                 <Search className={cn(

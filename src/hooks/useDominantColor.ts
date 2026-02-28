@@ -44,8 +44,8 @@ function adjustColor(r: number, g: number, b: number): [number, number, number] 
   // Boost saturation more aggressively for vivid colors
   let adjS = s;
   if (s < 30) adjS = s + 25; // boost dull significantly
-  else if (s > 85) adjS = 65 + (s - 85) * 0.3; // tame neon
-  else adjS = Math.max(s, 40); // ensure minimum vibrancy
+  else if (s > 95) adjS = 70 + (s - 95) * 0.3; // tame neon
+  else adjS = Math.max(s, 95); // ensure high vibrancy
 
   return hslToRgb(h, Math.min(adjS, 75), adjL);
 }

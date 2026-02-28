@@ -26,17 +26,16 @@ export const TrackCard = ({ track, tracks, index = 0 }: TrackCardProps) => {
 
   return (
     <motion.button
-      initial={{ opacity: 0, y: 12 }}
+      initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.35, delay: index * 0.04, type: 'spring', stiffness: 200 }}
+      transition={{ duration: 0.3, delay: index * 0.03, type: 'spring', stiffness: 200 }}
+      whileTap={{ scale: 0.97 }}
       onClick={handleClick}
-      className="group snap-start flex-shrink-0 w-[148px] sm:w-[168px] text-left"
+      className="group snap-start flex-shrink-0 w-[152px] sm:w-[172px] text-left"
     >
-      {/* Album art */}
-      <div className="relative aspect-square rounded-2xl overflow-hidden mb-2.5 shadow-lg shadow-black/50">
-        {/* Placeholder shimmer */}
+      <div className="relative aspect-square rounded-xl overflow-hidden mb-2.5 shadow-lg shadow-black/30">
         {!imgLoaded && (
-          <div className="absolute inset-0 bg-muted animate-pulse" />
+          <div className="absolute inset-0 bg-secondary animate-pulse" />
         )}
         {track.album_image ? (
           <img
@@ -51,23 +50,23 @@ export const TrackCard = ({ track, tracks, index = 0 }: TrackCardProps) => {
             decoding="async"
           />
         ) : (
-          <div className="h-full w-full bg-muted flex items-center justify-center">
+          <div className="h-full w-full bg-secondary flex items-center justify-center">
             <Play className="h-8 w-8 text-muted-foreground" />
           </div>
         )}
 
-        {/* Hover / active gradient overlay */}
+        {/* Hover gradient */}
         <div className={cn(
-          'absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent',
+          'absolute inset-0 bg-gradient-to-t from-black/55 via-transparent to-transparent',
           'transition-opacity duration-300',
           isActive ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
         )} />
 
-        {/* Play / pause button */}
+        {/* Play/pause fab */}
         <div className={cn(
           'absolute bottom-2.5 right-2.5 h-10 w-10 rounded-full flex items-center justify-center',
-          'bg-foreground shadow-2xl shadow-black/60',
-          'transform transition-all duration-300',
+          'bg-foreground shadow-xl shadow-black/50',
+          'transition-all duration-300',
           isActive ? 'scale-100 opacity-100' : 'scale-75 opacity-0 group-hover:scale-100 group-hover:opacity-100'
         )}>
           {isActive && isPlaying ? (
@@ -77,9 +76,8 @@ export const TrackCard = ({ track, tracks, index = 0 }: TrackCardProps) => {
           )}
         </div>
 
-        {/* Active indicator dot */}
         {isActive && (
-          <div className="absolute top-2.5 left-2.5 h-2 w-2 rounded-full bg-primary shadow-lg shadow-primary/50 animate-pulse" />
+          <div className="absolute top-2.5 left-2.5 h-2 w-2 rounded-full bg-primary animate-pulse shadow-lg shadow-primary/40" />
         )}
       </div>
 

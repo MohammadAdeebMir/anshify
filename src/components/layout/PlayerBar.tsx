@@ -336,14 +336,14 @@ export const PlayerBar = () => {
   const [miniDragY, setMiniDragY] = useState(0);
   const lastTapRef = useRef(0);
   const dominantColor = useDominantColor(player.currentTrack?.album_image);
-  const hdArtwork = useHDArtwork(player.currentTrack?.id, player.currentTrack?.album_image);
+  const hdArtwork = useHDArtwork(player.currentTrack?.id, player.currentTrack?.album_image, player.currentTrack?.name, player.currentTrack?.artist_name);
 
   // Preload next track artwork
   useEffect(() => {
     const { queue, queueIndex } = player;
     const nextTrack = queue[queueIndex + 1];
     if (nextTrack) {
-      preloadArtwork(nextTrack.id, nextTrack.album_image);
+      preloadArtwork(nextTrack.id, nextTrack.album_image, nextTrack.name, nextTrack.artist_name);
     }
   }, [player.queueIndex, player.queue]);
 
@@ -388,14 +388,13 @@ export const PlayerBar = () => {
   // Dynamic gradient — Spotify-level bold vertical blend
   const { r: cr, g: cg, b: cb, sr, sg, sb } = dominantColor;
   const accentGlow = `rgba(${cr},${cg},${cb},0.5)`;
-  // Rich multi-stop gradient: bold top fading to deep dark bottom
+  // Smoother gradient: softer top, gentle fade to dark
   const bgGradient = `
     linear-gradient(180deg,
-      rgb(${cr},${cg},${cb}) 0%,
-      rgb(${cr},${cg},${cb}) 20%,
-      rgb(${Math.round(cr*0.75)},${Math.round(cg*0.75)},${Math.round(cb*0.75)}) 40%,
-      rgb(${Math.round(cr*0.4)},${Math.round(cg*0.4)},${Math.round(cb*0.4)}) 60%,
-      rgb(${Math.round(cr*0.15)},${Math.round(cg*0.15)},${Math.round(cb*0.15)}) 80%,
+      rgb(${Math.round(cr*0.85)},${Math.round(cg*0.85)},${Math.round(cb*0.85)}) 0%,
+      rgb(${Math.round(cr*0.7)},${Math.round(cg*0.7)},${Math.round(cb*0.7)}) 25%,
+      rgb(${Math.round(cr*0.4)},${Math.round(cg*0.4)},${Math.round(cb*0.4)}) 50%,
+      rgb(${Math.round(cr*0.15)},${Math.round(cg*0.15)},${Math.round(cb*0.15)}) 75%,
       rgb(12,12,14) 100%
     )
   `;
@@ -490,7 +489,7 @@ export const PlayerBar = () => {
             initial={{ scale: 0.85, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             transition={{ type: 'spring', stiffness: 200, damping: 22, mass: 0.8, delay: 0.1 }}
-            className="flex-1 flex items-center justify-center px-[6%] relative min-h-0 py-3" style={{ zIndex: 2 }}
+            className="flex-1 flex items-center justify-center px-[10%] relative min-h-0 py-2" style={{ zIndex: 2 }}
           >
             <motion.div
               drag="x"
@@ -498,7 +497,7 @@ export const PlayerBar = () => {
               dragElastic={0.12}
               onDragEnd={handleArtworkSwipe}
               onTap={handleDoubleTap}
-              className="w-[85vw] max-w-[520px] aspect-square relative"
+              className="w-[80vw] max-w-[500px] aspect-square relative"
             >
               <AnimatePresence mode="wait">
                 <motion.div
@@ -509,29 +508,30 @@ export const PlayerBar = () => {
                   transition={{ duration: 0.4, ease: [0.25, 0.1, 0.25, 1] }}
                   className="w-full h-full"
                 >
-                  {/* Ambient glow behind artwork */}
+                  {/* Subtle ambient glow — reduced from -inset-8 to -inset-4 */}
                   <div
-                    className="absolute -inset-8 rounded-[40px] opacity-30 blur-[50px] pointer-events-none"
+                    className="absolute -inset-4 rounded-[28px] opacity-25 blur-[40px] pointer-events-none"
                     style={{
-                      background: `radial-gradient(circle, rgba(${cr},${cg},${cb},0.5) 0%, transparent 70%)`,
+                      background: `radial-gradient(circle, rgba(${cr},${cg},${cb},0.4) 0%, transparent 70%)`,
                       transition: 'background 400ms cubic-bezier(0.4,0,0.2,1)',
                     }}
                   />
                   {/* Artwork card */}
-                  <div className="relative w-full h-full rounded-[16px] overflow-hidden shadow-[0_20px_80px_rgba(0,0,0,0.7)]">
+                  <div className="relative w-full h-full rounded-[16px] overflow-hidden shadow-[0_16px_64px_rgba(0,0,0,0.6)]">
                     {hdArtwork ? (
                       <img
                         src={hdArtwork}
                         alt={currentTrack.album_name || 'Album art'}
                         className="h-full w-full object-cover"
                         decoding="async"
+                        style={{ imageRendering: 'auto' }}
                       />
                     ) : (
                       <div className="h-full w-full bg-white/[0.04] flex items-center justify-center">
                         <Music2 className="h-16 w-16 text-white/10" />
                       </div>
                     )}
-                    <div className="absolute inset-0 bg-gradient-to-b from-white/[0.03] via-transparent to-black/[0.08] pointer-events-none" />
+                    <div className="absolute inset-0 bg-gradient-to-b from-white/[0.02] via-transparent to-black/[0.06] pointer-events-none" />
                   </div>
 
                   {/* Buffering overlay */}

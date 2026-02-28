@@ -2,7 +2,8 @@ import { usePlayer } from '@/contexts/PlayerContext';
 import {
   Play, Pause, SkipBack, SkipForward, VolumeX, Volume2,
   Shuffle, Repeat, Repeat1, Timer, ChevronDown, Heart,
-  ListMusic, Loader2, RotateCcw, Music2
+  ListMusic, Loader2, RotateCcw, Music2, Share2, MoreHorizontal,
+  Moon
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -204,20 +205,21 @@ const PlayPauseBtn = memo(({ size = 'md', isPlaying, isBuffering, playbackError,
   isPlaying: boolean; isBuffering: boolean; playbackError: string | null;
   onPlay: () => void; onPause: () => void; onRetry: () => void;
 }) => {
-  const dims = size === 'lg' ? 'h-[64px] w-[64px]' : size === 'md' ? 'h-10 w-10' : 'h-9 w-9';
-  const iconSize = size === 'lg' ? 'h-7 w-7' : 'h-4 w-4';
+  const dims = size === 'lg' ? 'h-[68px] w-[68px]' : size === 'md' ? 'h-10 w-10' : 'h-9 w-9';
+  const iconSize = size === 'lg' ? 'h-8 w-8' : 'h-4 w-4';
+  const roundStyle = size === 'lg' ? 'rounded-2xl' : 'rounded-full';
 
   if (playbackError) {
     return (
       <motion.button whileTap={{ scale: 0.9 }} onClick={onRetry}
-        className={cn(dims, 'rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center')} title={playbackError}>
+        className={cn(dims, roundStyle, 'bg-white/10 backdrop-blur-sm flex items-center justify-center')} title={playbackError}>
         <RotateCcw className={cn(iconSize, 'text-white/80')} />
       </motion.button>
     );
   }
   if (isBuffering) {
     return (
-      <div className={cn(dims, 'rounded-full bg-white/5 flex items-center justify-center')}>
+      <div className={cn(dims, roundStyle, 'bg-white/5 flex items-center justify-center')}>
         <Loader2 className={cn(iconSize, 'text-white/60 animate-spin')} />
       </div>
     );
@@ -227,7 +229,7 @@ const PlayPauseBtn = memo(({ size = 'md', isPlaying, isBuffering, playbackError,
       whileTap={{ scale: 0.92 }}
       onClick={isPlaying ? onPause : onPlay}
       className={cn(
-        dims, 'rounded-full flex items-center justify-center',
+        dims, roundStyle, 'flex items-center justify-center',
         size === 'lg'
           ? 'bg-white text-black hover:bg-white/90 shadow-[0_4px_24px_rgba(255,255,255,0.15)]'
           : 'bg-white text-black hover:bg-white/90'
@@ -449,8 +451,8 @@ export const PlayerBar = () => {
             className="absolute inset-0"
             style={{ background: bgGradient, transition: 'background 400ms cubic-bezier(0.4,0,0.2,1)', zIndex: 0 }}
           />
-          {/* Subtle dark overlay for text readability without killing color */}
-          <div className="absolute inset-0 bg-black/[0.12]" style={{ zIndex: 0 }} />
+          {/* Subtle dark overlay for text readability */}
+          <div className="absolute inset-0 bg-black/[0.15]" style={{ zIndex: 0 }} />
 
           {/* Drag-down-to-close overlay */}
           <motion.div
@@ -462,27 +464,23 @@ export const PlayerBar = () => {
             onDragEnd={handleVerticalGesture}
           />
 
-          {/* Top bar */}
-          <div className="flex items-center justify-between px-6 relative"
-            style={{ zIndex: 2, paddingTop: 'max(env(safe-area-inset-top, 12px), 16px)', paddingBottom: '8px' }}>
+          {/* ── Top header: centered "Now Playing" + track title ── */}
+          <div className="relative flex flex-col items-center"
+            style={{ zIndex: 2, paddingTop: 'max(env(safe-area-inset-top, 12px), 20px)' }}>
+            {/* Chevron down button - absolute left */}
             <motion.button whileTap={{ scale: 0.88, opacity: 0.5 }} onClick={() => setExpanded(false)}
-              className="min-w-[44px] min-h-[44px] flex items-center justify-center -ml-2 text-white/50">
+              className="absolute left-4 min-w-[44px] min-h-[44px] flex items-center justify-center text-white/50"
+              style={{ top: 'max(env(safe-area-inset-top, 12px), 20px)' }}>
               <ChevronDown className="h-7 w-7" />
             </motion.button>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-white/30 select-none">Now Playing</p>
-            <motion.button whileTap={{ scale: 0.88, opacity: 0.5 }} onClick={() => setQueueOpen(true)}
-              className="min-w-[44px] min-h-[44px] flex items-center justify-center -mr-2 text-white/50 relative">
-              <ListMusic className="h-5 w-5" />
-              {upcomingCount > 0 && (
-                <span className="absolute top-1.5 right-1.5 h-4 w-4 rounded-full bg-white text-[9px] font-bold text-black flex items-center justify-center">
-                  {upcomingCount > 9 ? '9+' : upcomingCount}
-                </span>
-              )}
-            </motion.button>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-white/40 select-none">Now Playing</p>
+            <div className="mt-1.5 px-16 max-w-full">
+              <MarqueeText text={currentTrack.name} className="text-[13px] font-medium text-white/70 text-center" />
+            </div>
           </div>
 
-          {/* Album art — large, immersive, centered */}
-          <div className="flex-1 flex items-center justify-center px-[8%] sm:px-[10%] relative min-h-0" style={{ zIndex: 2 }}>
+          {/* ── Album art — large, immersive, centered ── */}
+          <div className="flex-1 flex items-center justify-center px-[8%] relative min-h-0 py-4" style={{ zIndex: 2 }}>
             <motion.div
               drag="x"
               dragConstraints={{ left: 0, right: 0 }}
@@ -502,9 +500,9 @@ export const PlayerBar = () => {
                 >
                   {/* Ambient glow behind artwork */}
                   <div
-                    className="absolute -inset-8 rounded-[40px] opacity-35 blur-[50px] pointer-events-none"
+                    className="absolute -inset-8 rounded-[40px] opacity-30 blur-[50px] pointer-events-none"
                     style={{
-                      background: `radial-gradient(circle, rgba(${cr},${cg},${cb},0.55) 0%, transparent 70%)`,
+                      background: `radial-gradient(circle, rgba(${cr},${cg},${cb},0.5) 0%, transparent 70%)`,
                       transition: 'background 400ms cubic-bezier(0.4,0,0.2,1)',
                     }}
                   />
@@ -522,13 +520,12 @@ export const PlayerBar = () => {
                         <Music2 className="h-16 w-16 text-white/10" />
                       </div>
                     )}
-                    {/* Glass overlay */}
                     <div className="absolute inset-0 bg-gradient-to-b from-white/[0.04] via-transparent to-black/[0.12] pointer-events-none" />
                   </div>
 
                   {/* Buffering overlay */}
                   {isBuffering && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-black/25 rounded-2xl">
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/25 rounded-[14px]">
                       <Loader2 className="h-10 w-10 text-white/60 animate-spin" />
                     </div>
                   )}
@@ -548,9 +545,10 @@ export const PlayerBar = () => {
             </motion.div>
           </div>
 
-          {/* Track info + controls */}
-          <div className="px-[8%] sm:px-8 relative pb-2" style={{ zIndex: 2, paddingBottom: 'max(env(safe-area-inset-bottom, 12px), 20px)' }}>
-            {/* Song info row with like */}
+          {/* ── Track info + controls bottom section ── */}
+          <div className="relative px-[8%]" style={{ zIndex: 2, paddingBottom: 'max(env(safe-area-inset-bottom, 12px), 16px)' }}>
+
+            {/* Song info row: title+artist left, share/heart/more right */}
             <AnimatePresence mode="wait">
               <motion.div
                 key={currentTrack.id + '-info'}
@@ -558,21 +556,28 @@ export const PlayerBar = () => {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -6 }}
                 transition={{ duration: 0.3 }}
-                className="flex items-start justify-between mb-4"
+                className="flex items-center justify-between mb-5"
               >
-                <div className="min-w-0 flex-1 mr-4">
-                  <MarqueeText text={currentTrack.name} className="text-[22px] font-extrabold text-white tracking-tight leading-tight" />
-                  <MarqueeText text={currentTrack.artist_name} className="text-[15px] text-amber-300/70 mt-0.5 font-normal" />
+                <div className="min-w-0 flex-1 mr-3">
+                  <MarqueeText text={currentTrack.name} className="text-[20px] font-bold text-white tracking-tight leading-tight" />
+                  <MarqueeText text={currentTrack.artist_name} className="text-[14px] text-white/50 mt-0.5 font-normal" />
                 </div>
-                {user && (
-                  <motion.button
-                    whileTap={{ scale: 0.85 }}
-                    onClick={handleLike}
-                    className="min-w-[44px] min-h-[44px] flex items-center justify-center mt-0.5"
-                  >
-                    <Heart className={cn('h-6 w-6 transition-colors', liked ? 'text-white fill-current' : 'text-white/35')} />
+                <div className="flex items-center gap-1">
+                  <motion.button whileTap={{ scale: 0.85 }}
+                    className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl bg-white/[0.06] active:bg-white/[0.12] transition-colors">
+                    <Share2 className="h-[18px] w-[18px] text-white/50" />
                   </motion.button>
-                )}
+                  {user && (
+                    <motion.button whileTap={{ scale: 0.85 }} onClick={handleLike}
+                      className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl bg-white/[0.06] active:bg-white/[0.12] transition-colors">
+                      <Heart className={cn('h-[18px] w-[18px] transition-colors', liked ? 'text-white fill-current' : 'text-white/50')} />
+                    </motion.button>
+                  )}
+                  <motion.button whileTap={{ scale: 0.85 }}
+                    className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl bg-white/[0.06] active:bg-white/[0.12] transition-colors">
+                    <MoreHorizontal className="h-[18px] w-[18px] text-white/50" />
+                  </motion.button>
+                </div>
               </motion.div>
             </AnimatePresence>
 
@@ -582,48 +587,72 @@ export const PlayerBar = () => {
             )}
 
             {/* Seek bar */}
-            <div className="mb-3">
+            <div className="mb-4">
               <SlimSeekBar progress={progress} duration={duration} onSeek={player.seek} isBuffering={isBuffering} accentColor={accentGlow} />
             </div>
 
-            {/* Main controls */}
-            <div className="flex items-center justify-between px-2 mb-3">
-              <CtrlBtn onClick={player.toggleShuffle} active={shuffle}>
-                <Shuffle className="h-[22px] w-[22px]" />
-              </CtrlBtn>
-              <CtrlBtn onClick={player.previous} className="text-white/60 hover:text-white">
-                <SkipBack className="h-7 w-7 fill-current" />
-              </CtrlBtn>
+            {/* Main controls — rounded square backgrounds like screenshot */}
+            <div className="flex items-center justify-between px-1 mb-5">
+              <motion.button whileTap={{ scale: 0.88, opacity: 0.6 }} onClick={player.toggleShuffle}
+                className={cn(
+                  'h-[52px] w-[52px] rounded-2xl flex items-center justify-center transition-colors',
+                  'bg-white/[0.06] active:bg-white/[0.12] backdrop-blur-sm',
+                  shuffle ? 'text-white' : 'text-white/40'
+                )}>
+                <Shuffle className="h-[20px] w-[20px]" />
+              </motion.button>
+
+              <motion.button whileTap={{ scale: 0.88, opacity: 0.6 }} onClick={player.previous}
+                className="h-[52px] w-[52px] rounded-2xl flex items-center justify-center bg-white/[0.06] active:bg-white/[0.12] backdrop-blur-sm text-white/70">
+                <SkipBack className="h-6 w-6 fill-current" />
+              </motion.button>
+
+              {/* Large center play button — white rounded square */}
               <PlayPauseBtn size="lg" isPlaying={isPlaying} isBuffering={isBuffering}
                 playbackError={playbackError} onPlay={player.resume} onPause={player.pause} onRetry={player.retryPlayback} />
-              <CtrlBtn onClick={player.next} className="text-white/60 hover:text-white">
-                <SkipForward className="h-7 w-7 fill-current" />
-              </CtrlBtn>
-              <CtrlBtn onClick={player.toggleRepeat} active={repeat !== 'off'}>
-                {repeat === 'one' ? <Repeat1 className="h-[22px] w-[22px]" /> : <Repeat className="h-[22px] w-[22px]" />}
-              </CtrlBtn>
+
+              <motion.button whileTap={{ scale: 0.88, opacity: 0.6 }} onClick={player.next}
+                className="h-[52px] w-[52px] rounded-2xl flex items-center justify-center bg-white/[0.06] active:bg-white/[0.12] backdrop-blur-sm text-white/70">
+                <SkipForward className="h-6 w-6 fill-current" />
+              </motion.button>
+
+              <motion.button whileTap={{ scale: 0.88, opacity: 0.6 }} onClick={player.toggleRepeat}
+                className={cn(
+                  'h-[52px] w-[52px] rounded-2xl flex items-center justify-center transition-colors',
+                  'bg-white/[0.06] active:bg-white/[0.12] backdrop-blur-sm',
+                  repeat !== 'off' ? 'text-white' : 'text-white/40'
+                )}>
+                {repeat === 'one' ? <Repeat1 className="h-[20px] w-[20px]" /> : <Repeat className="h-[20px] w-[20px]" />}
+              </motion.button>
             </div>
 
-            {/* Bottom row — lyrics + sleep timer */}
-            <div className="flex items-center justify-between px-2">
+            {/* Bottom action row — Queue | Sleep | Lyrics | More */}
+            <div className="flex items-center justify-between gap-2">
               <motion.button
-                whileTap={{ scale: 0.9, opacity: 0.6 }}
-                onClick={() => setLyricsOpen(true)}
-                className="text-xs font-semibold text-white/30 hover:text-white/50 min-h-[44px] flex items-center px-3 rounded-full bg-white/[0.04] active:bg-white/[0.08] transition-colors"
-              >
-                Lyrics
-              </motion.button>
-              {sleepTimer !== null && (
-                <span className="text-[10px] text-white/25 flex items-center gap-1">
-                  <Timer className="h-3 w-3" /> Sleep in {sleepTimer}m
-                </span>
-              )}
-              <motion.button
-                whileTap={{ scale: 0.9, opacity: 0.6 }}
+                whileTap={{ scale: 0.92, opacity: 0.6 }}
                 onClick={() => setQueueOpen(true)}
-                className="text-xs font-semibold text-white/30 hover:text-white/50 min-h-[44px] flex items-center px-3 rounded-full bg-white/[0.04] active:bg-white/[0.08] transition-colors"
+                className="flex items-center gap-2 h-[44px] px-4 rounded-full bg-white/[0.06] active:bg-white/[0.1] transition-colors"
               >
-                Queue
+                <ListMusic className="h-4 w-4 text-white/50" />
+                <span className="text-[13px] font-medium text-white/50">Queue</span>
+              </motion.button>
+
+              <SleepTimerPopover />
+
+              <motion.button
+                whileTap={{ scale: 0.92, opacity: 0.6 }}
+                onClick={() => setLyricsOpen(true)}
+                className="flex items-center gap-2 h-[44px] px-4 rounded-full bg-white/[0.06] active:bg-white/[0.1] transition-colors"
+              >
+                <ListMusic className="h-4 w-4 text-white/50" />
+                <span className="text-[13px] font-medium text-white/50">Lyrics</span>
+              </motion.button>
+
+              <motion.button
+                whileTap={{ scale: 0.88, opacity: 0.5 }}
+                className="h-[44px] w-[44px] rounded-full bg-white/[0.06] active:bg-white/[0.1] flex items-center justify-center transition-colors"
+              >
+                <MoreHorizontal className="h-5 w-5 text-white/40" />
               </motion.button>
             </div>
           </div>

@@ -11,7 +11,7 @@ import { motion, AnimatePresence, PanInfo } from 'framer-motion';
 import { useState, useRef, useCallback, useEffect, memo, useMemo } from 'react';
 
 /* ─── Marquee Text ───────────────────────────────────────────────── */
-const MarqueeText = memo(({ text, className, forceScroll = false }: { text: string; className?: string; forceScroll?: boolean }) => {
+const MarqueeText = memo(({ text, className, forceScroll = false, syncDuration }: { text: string; className?: string; forceScroll?: boolean; syncDuration?: number }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const textRef = useRef<HTMLSpanElement>(null);
   const [shouldScroll, setShouldScroll] = useState(false);
@@ -24,7 +24,7 @@ const MarqueeText = memo(({ text, className, forceScroll = false }: { text: stri
       if (!container || !textEl) return;
       const overflow = textEl.scrollWidth > container.clientWidth + 2;
       setShouldScroll(forceScroll || overflow);
-      if (forceScroll || overflow) {
+      if (!syncDuration && (forceScroll || overflow)) {
         setScrollDuration(Math.max(5, textEl.scrollWidth / 35));
       }
     };
@@ -32,7 +32,9 @@ const MarqueeText = memo(({ text, className, forceScroll = false }: { text: stri
     const ro = new ResizeObserver(check);
     if (containerRef.current) ro.observe(containerRef.current);
     return () => ro.disconnect();
-  }, [text, forceScroll]);
+  }, [text, forceScroll, syncDuration]);
+
+  const dur = syncDuration || scrollDuration;
 
   return (
     <div
@@ -53,7 +55,7 @@ const MarqueeText = memo(({ text, className, forceScroll = false }: { text: stri
         style={
           shouldScroll
             ? {
-                animation: `marquee-scroll ${scrollDuration + 3}s ease-in-out 0s infinite`,
+                animation: `marquee-scroll ${dur}s ease-in-out 0s infinite`,
                 willChange: 'transform',
               }
             : undefined
@@ -737,8 +739,8 @@ export const PlayerBar = () => {
               )}
             </motion.div>
             <div className="min-w-0 max-w-[45vw] sm:max-w-[200px]">
-              <MarqueeText text={currentTrack.name} className="text-[13px] font-semibold text-white tracking-tight" forceScroll />
-              <MarqueeText text={currentTrack.artist_name} className="text-[11px] text-amber-300/60 mt-0.5" forceScroll />
+              <MarqueeText text={currentTrack.name} className="text-[13px] font-semibold text-white tracking-tight" forceScroll syncDuration={12} />
+              <MarqueeText text={currentTrack.artist_name} className="text-[11px] text-amber-300/60 mt-0.5" forceScroll syncDuration={12} />
             </div>
           </button>
 

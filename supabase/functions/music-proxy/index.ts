@@ -11,33 +11,61 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Simple in-memory rate limiter for unauthenticated requests
+const guestRequests = new Map<string, { count: number; resetAt: number }>();
+const GUEST_RATE_LIMIT = 30; // requests per window
+const GUEST_RATE_WINDOW_MS = 60_000; // 1 minute
+
+function isGuestRateLimited(ip: string): boolean {
+  const now = Date.now();
+  const entry = guestRequests.get(ip);
+  if (!entry || now > entry.resetAt) {
+    guestRequests.set(ip, { count: 1, resetAt: now + GUEST_RATE_WINDOW_MS });
+    return false;
+  }
+  entry.count++;
+  return entry.count > GUEST_RATE_LIMIT;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
-  // Authentication check
+  // Determine if user is authenticated (optional auth)
   const authHeader = req.headers.get("Authorization");
-  if (!authHeader?.startsWith("Bearer ")) {
-    return new Response(JSON.stringify({ error: "Authentication required" }), {
-      status: 401,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+  let isAuthenticated = false;
+
+  if (authHeader?.startsWith("Bearer ")) {
+    const token = authHeader.replace("Bearer ", "");
+    // Only validate if it looks like a real JWT (has 3 parts), not the anon key
+    const parts = token.split(".");
+    if (parts.length === 3) {
+      try {
+        const supabaseClient = createClient(
+          Deno.env.get("SUPABASE_URL")!,
+          Deno.env.get("SUPABASE_ANON_KEY")!,
+          { global: { headers: { Authorization: authHeader } } }
+        );
+        const { data: claimsData, error: claimsError } = await supabaseClient.auth.getClaims(token);
+        if (!claimsError && claimsData?.claims?.sub) {
+          isAuthenticated = true;
+        }
+      } catch {
+        // Token invalid, treat as guest
+      }
+    }
   }
 
-  const supabaseClient = createClient(
-    Deno.env.get("SUPABASE_URL")!,
-    Deno.env.get("SUPABASE_ANON_KEY")!,
-    { global: { headers: { Authorization: authHeader } } }
-  );
-
-  const token = authHeader.replace("Bearer ", "");
-  const { data: claimsData, error: claimsError } = await supabaseClient.auth.getClaims(token);
-  if (claimsError || !claimsData?.claims) {
-    return new Response(JSON.stringify({ error: "Unauthorized" }), {
-      status: 401,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+  // Rate limit unauthenticated requests
+  if (!isAuthenticated) {
+    const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+    if (isGuestRateLimited(clientIp)) {
+      return new Response(JSON.stringify({ error: "Too many requests. Please try again later." }), {
+        status: 429,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
   }
 
   const url = new URL(req.url);

@@ -249,10 +249,12 @@ const CtrlBtn = memo(({ onClick, active, children, className: cls }: {
   onClick: () => void; active?: boolean; children: React.ReactNode; className?: string;
 }) => (
   <motion.button
-    whileTap={{ scale: 0.88, opacity: 0.6 }}
+    whileTap={{ scale: 0.82, opacity: 0.5 }}
+    transition={{ type: 'spring', stiffness: 500, damping: 20, mass: 0.6 }}
     onClick={onClick}
     className={cn(
       'flex items-center justify-center min-w-[44px] min-h-[44px] transition-colors duration-200',
+      'active:bg-white/[0.08] rounded-xl',
       active ? 'text-white' : 'text-white/40 hover:text-white/65', cls
     )}
   >
@@ -593,17 +595,23 @@ export const PlayerBar = () => {
 
             {/* Main controls — rounded square backgrounds like screenshot */}
             <div className="flex items-center justify-between px-1 mb-5">
-              <motion.button whileTap={{ scale: 0.88, opacity: 0.6 }} onClick={player.toggleShuffle}
+              <motion.button
+                whileTap={{ scale: 0.82, opacity: 0.5 }}
+                transition={{ type: 'spring', stiffness: 500, damping: 20, mass: 0.6 }}
+                onClick={player.toggleShuffle}
                 className={cn(
-                  'h-[52px] w-[52px] rounded-2xl flex items-center justify-center transition-colors',
-                  'bg-white/[0.06] active:bg-white/[0.12] backdrop-blur-sm',
+                  'h-[52px] w-[52px] rounded-2xl flex items-center justify-center transition-all duration-150',
+                  'bg-white/[0.06] active:bg-white/[0.14] backdrop-blur-sm',
                   shuffle ? 'text-white' : 'text-white/40'
                 )}>
                 <Shuffle className="h-[20px] w-[20px]" />
               </motion.button>
 
-              <motion.button whileTap={{ scale: 0.88, opacity: 0.6 }} onClick={player.previous}
-                className="h-[52px] w-[52px] rounded-2xl flex items-center justify-center bg-white/[0.06] active:bg-white/[0.12] backdrop-blur-sm text-white/70">
+              <motion.button
+                whileTap={{ scale: 0.82, opacity: 0.5 }}
+                transition={{ type: 'spring', stiffness: 500, damping: 20, mass: 0.6 }}
+                onClick={player.previous}
+                className="h-[52px] w-[52px] rounded-2xl flex items-center justify-center bg-white/[0.06] active:bg-white/[0.14] backdrop-blur-sm text-white/70 transition-all duration-150">
                 <SkipBack className="h-6 w-6 fill-current" />
               </motion.button>
 
@@ -611,15 +619,21 @@ export const PlayerBar = () => {
               <PlayPauseBtn size="lg" isPlaying={isPlaying} isBuffering={isBuffering}
                 playbackError={playbackError} onPlay={player.resume} onPause={player.pause} onRetry={player.retryPlayback} />
 
-              <motion.button whileTap={{ scale: 0.88, opacity: 0.6 }} onClick={player.next}
-                className="h-[52px] w-[52px] rounded-2xl flex items-center justify-center bg-white/[0.06] active:bg-white/[0.12] backdrop-blur-sm text-white/70">
+              <motion.button
+                whileTap={{ scale: 0.82, opacity: 0.5 }}
+                transition={{ type: 'spring', stiffness: 500, damping: 20, mass: 0.6 }}
+                onClick={player.next}
+                className="h-[52px] w-[52px] rounded-2xl flex items-center justify-center bg-white/[0.06] active:bg-white/[0.14] backdrop-blur-sm text-white/70 transition-all duration-150">
                 <SkipForward className="h-6 w-6 fill-current" />
               </motion.button>
 
-              <motion.button whileTap={{ scale: 0.88, opacity: 0.6 }} onClick={player.toggleRepeat}
+              <motion.button
+                whileTap={{ scale: 0.82, opacity: 0.5 }}
+                transition={{ type: 'spring', stiffness: 500, damping: 20, mass: 0.6 }}
+                onClick={player.toggleRepeat}
                 className={cn(
-                  'h-[52px] w-[52px] rounded-2xl flex items-center justify-center transition-colors',
-                  'bg-white/[0.06] active:bg-white/[0.12] backdrop-blur-sm',
+                  'h-[52px] w-[52px] rounded-2xl flex items-center justify-center transition-all duration-150',
+                  'bg-white/[0.06] active:bg-white/[0.14] backdrop-blur-sm',
                   repeat !== 'off' ? 'text-white' : 'text-white/40'
                 )}>
                 {repeat === 'one' ? <Repeat1 className="h-[20px] w-[20px]" /> : <Repeat className="h-[20px] w-[20px]" />}
@@ -629,9 +643,10 @@ export const PlayerBar = () => {
             {/* Bottom action row — Queue | Sleep | Lyrics | More */}
             <div className="flex items-center justify-between gap-2">
               <motion.button
-                whileTap={{ scale: 0.92, opacity: 0.6 }}
+                whileTap={{ scale: 0.88, opacity: 0.5 }}
+                transition={{ type: 'spring', stiffness: 500, damping: 20, mass: 0.6 }}
                 onClick={() => setQueueOpen(true)}
-                className="flex items-center gap-2 h-[44px] px-4 rounded-full bg-white/[0.06] active:bg-white/[0.1] transition-colors"
+                className="flex items-center gap-2 h-[44px] px-4 rounded-full bg-white/[0.06] active:bg-white/[0.12] transition-all duration-150"
               >
                 <ListMusic className="h-4 w-4 text-white/50" />
                 <span className="text-[13px] font-medium text-white/50">Queue</span>
@@ -640,17 +655,19 @@ export const PlayerBar = () => {
               <SleepTimerPopover />
 
               <motion.button
-                whileTap={{ scale: 0.92, opacity: 0.6 }}
+                whileTap={{ scale: 0.88, opacity: 0.5 }}
+                transition={{ type: 'spring', stiffness: 500, damping: 20, mass: 0.6 }}
                 onClick={() => setLyricsOpen(true)}
-                className="flex items-center gap-2 h-[44px] px-4 rounded-full bg-white/[0.06] active:bg-white/[0.1] transition-colors"
+                className="flex items-center gap-2 h-[44px] px-4 rounded-full bg-white/[0.06] active:bg-white/[0.12] transition-all duration-150"
               >
                 <ListMusic className="h-4 w-4 text-white/50" />
                 <span className="text-[13px] font-medium text-white/50">Lyrics</span>
               </motion.button>
 
               <motion.button
-                whileTap={{ scale: 0.88, opacity: 0.5 }}
-                className="h-[44px] w-[44px] rounded-full bg-white/[0.06] active:bg-white/[0.1] flex items-center justify-center transition-colors"
+                whileTap={{ scale: 0.82, opacity: 0.4 }}
+                transition={{ type: 'spring', stiffness: 500, damping: 20, mass: 0.6 }}
+                className="h-[44px] w-[44px] rounded-full bg-white/[0.06] active:bg-white/[0.12] flex items-center justify-center transition-all duration-150"
               >
                 <MoreHorizontal className="h-5 w-5 text-white/40" />
               </motion.button>

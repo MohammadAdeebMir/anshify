@@ -37,12 +37,12 @@ const ContinueCard = ({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3, delay: index * 0.04 }}
       onClick={isActive && isPlaying ? onPause : onPlay}
-      className="group snap-start flex-shrink-0 w-[148px] sm:w-[168px] text-left"
+      className="group snap-start flex-shrink-0 w-[165px] sm:w-[185px] text-left"
     >
       <div className={cn(
-        'relative aspect-square rounded-sm overflow-hidden mb-2.5 shadow-lg shadow-black/50',
+        'relative aspect-square overflow-hidden mb-2.5 shadow-lg shadow-black/50',
         isActive && 'ring-2 ring-primary/60 ring-offset-2 ring-offset-background'
-      )}>
+      )} style={{ borderRadius: '1px' }}>
         {/* Shimmer placeholder */}
         {!imgLoaded && (
           <div className="absolute inset-0 bg-muted animate-pulse" />

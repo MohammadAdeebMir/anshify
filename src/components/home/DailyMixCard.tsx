@@ -21,10 +21,11 @@ export const DailyMixCard = ({ mix, index }: DailyMixCardProps) => {
     <button
       onClick={() => mix.tracks.length > 0 && play(mix.tracks[0], mix.tracks)}
       className={cn(
-        'group relative rounded-sm overflow-hidden text-left aspect-square sm:aspect-[4/3]',
+        'group relative overflow-hidden text-left aspect-square',
         'bg-gradient-to-br transition-transform duration-300 hover:scale-[1.03]',
         gradients[index % 3]
       )}
+      style={{ borderRadius: '1px' }}
     >
       {/* Subtle grid overlay for texture */}
       <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />

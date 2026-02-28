@@ -31,9 +31,9 @@ export const TrackCard = ({ track, tracks, index = 0 }: TrackCardProps) => {
       transition={{ duration: 0.3, delay: index * 0.03, type: 'spring', stiffness: 200 }}
       whileTap={{ scale: 0.97 }}
       onClick={handleClick}
-      className="group snap-start flex-shrink-0 w-[152px] sm:w-[172px] text-left"
+      className="group snap-start flex-shrink-0 w-[165px] sm:w-[185px] text-left"
     >
-      <div className="relative aspect-square rounded-sm overflow-hidden mb-2.5 shadow-lg shadow-black/30">
+      <div className="relative aspect-square overflow-hidden mb-2.5 shadow-lg shadow-black/30" style={{ borderRadius: '1px' }}>
         {!imgLoaded && (
           <div className="absolute inset-0 bg-secondary animate-pulse" />
         )}

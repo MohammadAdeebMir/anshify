@@ -185,10 +185,11 @@ const Index = () => {
             className="absolute inset-0 transition-all duration-[600ms]"
             style={{
               background: theme === 'obsidian'
-                ? 'radial-gradient(ellipse at 40% 15%, hsl(240 8% 45% / 0.04) 0%, transparent 50%)'
-                : isNight
-                  ? 'radial-gradient(ellipse at 30% 10%, hsl(35 30% 45% / 0.05) 0%, transparent 50%), radial-gradient(ellipse at 70% 85%, hsl(25 20% 40% / 0.03) 0%, transparent 50%)'
-                  : 'radial-gradient(ellipse at 25% 15%, hsl(35 35% 50% / 0.045) 0%, transparent 50%), radial-gradient(ellipse at 80% 80%, hsl(30 25% 45% / 0.03) 0%, transparent 45%)',
+                ? 'radial-gradient(ellipse at 20% 10%, hsl(210 80% 50% / 0.06) 0%, transparent 50%), radial-gradient(ellipse at 80% 85%, hsl(40 70% 50% / 0.05) 0%, transparent 50%)'
+                : `radial-gradient(ellipse at 15% 8%, hsl(40 75% 55% / 0.07) 0%, transparent 45%),
+                   radial-gradient(ellipse at 85% 15%, hsl(210 90% 55% / 0.06) 0%, transparent 45%),
+                   radial-gradient(ellipse at 50% 90%, hsl(35 65% 50% / 0.04) 0%, transparent 40%),
+                   radial-gradient(ellipse at 70% 60%, hsl(200 80% 50% / 0.03) 0%, transparent 40%)`,
             }}
           />
         </div>

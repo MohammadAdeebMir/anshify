@@ -3,7 +3,7 @@ import {
   Play, Pause, SkipBack, SkipForward, VolumeX, Volume2,
   Shuffle, Repeat, Repeat1, Timer, ChevronDown, Heart,
   ListMusic, Loader2, RotateCcw, Music2, Share2, MoreHorizontal,
-  Moon
+  Moon, X
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -692,8 +692,17 @@ export const PlayerBar = () => {
       <motion.div
         initial={{ y: 100, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
+        exit={{ y: 100, opacity: 0 }}
         transition={{ type: 'spring', damping: 28, stiffness: 260 }}
         className={cn('fixed left-0 right-0 z-30', isMobile ? 'bottom-14' : 'bottom-0')}
+        drag="y"
+        dragConstraints={{ top: 0, bottom: 0 }}
+        dragElastic={0.3}
+        onDragEnd={(_, info) => {
+          if (info.offset.y > 60 || info.velocity.y > 300) {
+            player.dismissPlayer();
+          }
+        }}
       >
         <div className="absolute inset-0"
           style={{
@@ -712,10 +721,6 @@ export const PlayerBar = () => {
 
         <motion.div
           className={cn('flex items-center gap-3 px-3 sm:px-5 relative z-10', isMobile ? 'h-[60px]' : 'h-[68px]')}
-          drag={isMobile ? 'x' : false}
-          dragConstraints={{ left: 0, right: 0 }}
-          dragElastic={0.15}
-          onDragEnd={handleArtworkSwipe}
         >
           <button onClick={() => isMobile && setExpanded(true)} className="flex items-center gap-3 flex-1 min-w-0 text-left">
             <motion.div
@@ -751,6 +756,12 @@ export const PlayerBar = () => {
               <PlayPauseBtn size="sm" isPlaying={isPlaying} isBuffering={isBuffering}
                 playbackError={playbackError} onPlay={player.resume} onPause={player.pause} onRetry={player.retryPlayback} />
               <CtrlBtn onClick={player.next} className="p-1.5 text-white/50 hover:text-white"><SkipForward className="h-[18px] w-[18px] fill-current" /></CtrlBtn>
+              {isMobile && (
+                <motion.button whileTap={{ scale: 0.8 }} onClick={player.dismissPlayer}
+                  className="ml-1 p-1.5 text-white/30 hover:text-white/60 transition-colors min-w-[36px] min-h-[36px] flex items-center justify-center">
+                  <X className="h-4 w-4" />
+                </motion.button>
+              )}
               {!isMobile && <CtrlBtn onClick={player.toggleRepeat} active={repeat !== 'off'} className="p-1.5">
                 {repeat === 'one' ? <Repeat1 className="h-4 w-4" /> : <Repeat className="h-4 w-4" />}
               </CtrlBtn>}
@@ -780,6 +791,10 @@ export const PlayerBar = () => {
                 className="p-1.5 text-white/25 hover:text-white/60 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center">
                 {volume === 0 ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
               </button>
+              <motion.button whileTap={{ scale: 0.8 }} onClick={player.dismissPlayer}
+                className="p-1.5 text-white/25 hover:text-white/60 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center">
+                <X className="h-4 w-4" />
+              </motion.button>
             </div>
           )}
         </motion.div>

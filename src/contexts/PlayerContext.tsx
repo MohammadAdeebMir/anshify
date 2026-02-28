@@ -26,6 +26,7 @@ interface PlayerContextType extends PlayerState {
   removeFromQueue: (index: number) => void;
   reorderQueue: (from: number, to: number) => void;
   clearQueue: () => void;
+  dismissPlayer: () => void;
   queueHistory: QueueHistoryEntry[];
   onTrackPlay: (cb: (track: Track) => void) => () => void;
   crossfadeDuration: CrossfadeMode;
@@ -341,6 +342,11 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const removeFromQueue = useCallback((index: number) => { setState(s => { if (index === s.queueIndex) return s; const nq = s.queue.filter((_, i) => i !== index); const ni = index < s.queueIndex ? s.queueIndex - 1 : s.queueIndex; return { ...s, queue: nq, queueIndex: ni }; }); }, []);
   const reorderQueue = useCallback((from: number, to: number) => { setState(s => { const nq = [...s.queue]; const [moved] = nq.splice(from, 1); nq.splice(to, 0, moved); let ni = s.queueIndex; if (from === s.queueIndex) ni = to; else if (from < s.queueIndex && to >= s.queueIndex) ni--; else if (from > s.queueIndex && to <= s.queueIndex) ni++; return { ...s, queue: nq, queueIndex: ni }; }); }, []);
   const clearQueue = useCallback(() => { setState(s => { const c = s.currentTrack; return { ...s, queue: c ? [c] : [], queueIndex: c ? 0 : -1 }; }); }, []);
+  const dismissPlayer = useCallback(() => {
+    yt.pause();
+    setState(s => ({ ...s, currentTrack: null, queue: [], queueIndex: -1, isPlaying: false, progress: 0, duration: 0 }));
+    try { localStorage.removeItem(QUEUE_KEY); localStorage.removeItem(QUEUE_INDEX_KEY); localStorage.removeItem(QUEUE_TRACK_KEY); } catch {}
+  }, [yt]);
 
   const onTrackPlay = useCallback((cb: (track: Track) => void) => { trackPlayListeners.current.add(cb); return () => { trackPlayListeners.current.delete(cb); }; }, []);
   const setCrossfadeDuration = useCallback((d: CrossfadeMode) => { localStorage.setItem('ph-crossfade', String(d)); setCrossfadeDurationState(d); }, []);
@@ -366,7 +372,7 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   return (
     <PlayerContext.Provider value={{
       ...state, play, pause: pausePlayback, resume, next, previous, seek, setVolume,
-      toggleShuffle, toggleRepeat, addToQueue, playNext, removeFromQueue, reorderQueue, clearQueue, queueHistory, onTrackPlay,
+      toggleShuffle, toggleRepeat, addToQueue, playNext, removeFromQueue, reorderQueue, clearQueue, dismissPlayer, queueHistory, onTrackPlay,
       crossfadeDuration, setCrossfadeDuration,
       sleepTimer, setSleepTimer, sleepTimerEnd,
       volumeNormalization, setVolumeNormalization,

@@ -1,7 +1,7 @@
 /**
  * Ultra HD Artwork Utility
  * Smart multi-source artwork pipeline:
- * YouTube HD → iTunes/Apple Music → fallback
+ * iTunes/Apple Music (PRIMARY) → YouTube HD → fallback
  */
 
 const artworkCache = new Map<string, string>();
@@ -42,7 +42,7 @@ function getYouTubeThumbnailUrl(videoId: string, quality: string): string {
 /**
  * Check if an image URL loads and meets minimum quality
  */
-function probeImage(url: string, minSize = 200): Promise<{ url: string; width: number; height: number } | null> {
+function probeImage(url: string, minSize = 480): Promise<{ url: string; width: number; height: number } | null> {
   if (failedUrls.has(url)) return Promise.resolve(null);
   
   return new Promise((resolve) => {
@@ -74,8 +74,13 @@ function probeImage(url: string, minSize = 200): Promise<{ url: string; width: n
 }
 
 /**
- * Fetch HD artwork from iTunes Search API
- * Returns 1000x1000 artwork URL or null
+ * iTunes HD resolution chain — try largest first
+ */
+const ITUNES_SIZES = ['2000x2000bb', '1500x1500bb', '1000x1000bb'] as const;
+
+/**
+ * Fetch HD artwork from iTunes Search API (PRIMARY source)
+ * Tries 2000 → 1500 → 1000 resolution progressively
  */
 async function fetchITunesArtwork(trackName: string, artistName: string): Promise<string | null> {
   const cacheKey = `${trackName}::${artistName}`.toLowerCase();
@@ -84,10 +89,10 @@ async function fetchITunesArtwork(trackName: string, artistName: string): Promis
   try {
     const query = encodeURIComponent(`${trackName} ${artistName}`);
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 3000);
+    const timeout = setTimeout(() => controller.abort(), 4000);
     
     const res = await fetch(
-      `https://itunes.apple.com/search?term=${query}&entity=song&limit=3`,
+      `https://itunes.apple.com/search?term=${query}&entity=song&limit=5`,
       { signal: controller.signal }
     );
     clearTimeout(timeout);
@@ -103,32 +108,46 @@ async function fetchITunesArtwork(trackName: string, artistName: string): Promis
       return null;
     }
 
-    // Find best match
+    // Find best match — prefer exact artist + track match
     const normalizedTrack = trackName.toLowerCase().replace(/[^a-z0-9]/g, '');
     const normalizedArtist = artistName.toLowerCase().replace(/[^a-z0-9]/g, '');
     
     let bestResult = data.results[0];
+    let bestScore = 0;
     for (const result of data.results) {
       const rTrack = (result.trackName || '').toLowerCase().replace(/[^a-z0-9]/g, '');
       const rArtist = (result.artistName || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-      if (rTrack.includes(normalizedTrack) || normalizedTrack.includes(rTrack)) {
-        if (rArtist.includes(normalizedArtist) || normalizedArtist.includes(rArtist)) {
-          bestResult = result;
-          break;
-        }
+      let score = 0;
+      if (rTrack === normalizedTrack) score += 3;
+      else if (rTrack.includes(normalizedTrack) || normalizedTrack.includes(rTrack)) score += 1;
+      if (rArtist === normalizedArtist) score += 3;
+      else if (rArtist.includes(normalizedArtist) || normalizedArtist.includes(rArtist)) score += 1;
+      if (score > bestScore) {
+        bestScore = score;
+        bestResult = result;
       }
     }
 
-    const artworkUrl = bestResult.artworkUrl100;
-    if (!artworkUrl) {
+    const artworkUrl100 = bestResult.artworkUrl100;
+    if (!artworkUrl100) {
       itunesCache.set(cacheKey, null);
       return null;
     }
 
-    // Upgrade to 1000x1000
-    const hdUrl = artworkUrl.replace(/100x100bb/, '1000x1000bb');
-    itunesCache.set(cacheKey, hdUrl);
-    return hdUrl;
+    // Progressive HD upgrade: 2000 → 1500 → 1000
+    for (const size of ITUNES_SIZES) {
+      const hdUrl = artworkUrl100.replace(/100x100bb/, size);
+      const result = await probeImage(hdUrl, 480);
+      if (result) {
+        itunesCache.set(cacheKey, result.url);
+        return result.url;
+      }
+    }
+
+    // Fallback to 600x600
+    const fallbackUrl = artworkUrl100.replace(/100x100bb/, '600x600bb');
+    itunesCache.set(cacheKey, fallbackUrl);
+    return fallbackUrl;
   } catch {
     itunesCache.set(cacheKey, null);
     return null;
@@ -137,7 +156,7 @@ async function fetchITunesArtwork(trackName: string, artistName: string): Promis
 
 /**
  * Get the best available artwork URL for a track
- * Priority: YouTube HD → iTunes HD → original
+ * Priority: iTunes HD (primary) → YouTube HD → original
  */
 export async function getHDArtwork(
   trackId: string,
@@ -149,17 +168,18 @@ export async function getHDArtwork(
   const cached = artworkCache.get(cacheKey);
   if (cached) return cached;
 
-  // If the original URL is already high quality YouTube, use it
-  if (originalUrl?.includes('maxresdefault') || originalUrl?.includes('sddefault')) {
-    artworkCache.set(cacheKey, originalUrl);
-    return originalUrl;
+  // 1. iTunes HD (PRIMARY) — if we have track + artist info
+  if (trackName && artistName) {
+    const itunesUrl = await fetchITunesArtwork(trackName, artistName);
+    if (itunesUrl) {
+      artworkCache.set(cacheKey, itunesUrl);
+      return itunesUrl;
+    }
   }
 
-  // Try to extract video ID from track ID
+  // 2. YouTube HD fallback
   const videoId = extractVideoId(trackId);
-  
   if (videoId) {
-    // Try YouTube thumbnails in quality order
     for (const quality of YT_THUMB_QUALITIES) {
       const url = getYouTubeThumbnailUrl(videoId, quality);
       const minSize = quality === 'maxresdefault' ? 400 : quality === 'sddefault' ? 300 : 200;
@@ -171,27 +191,20 @@ export async function getHDArtwork(
     }
   }
 
-  // Try iTunes Search API as fallback
-  if (trackName && artistName) {
-    const itunesUrl = await fetchITunesArtwork(trackName, artistName);
-    if (itunesUrl) {
-      // Probe to confirm it loads
-      const result = await probeImage(itunesUrl, 400);
-      if (result) {
-        artworkCache.set(cacheKey, result.url);
-        return result.url;
-      }
-    }
+  // 3. If the original URL is already high quality, use it
+  if (originalUrl?.includes('maxresdefault') || originalUrl?.includes('sddefault')) {
+    artworkCache.set(cacheKey, originalUrl);
+    return originalUrl;
   }
 
-  // Fallback to original URL
+  // 4. Fallback to original URL
   const fallback = originalUrl || '';
   if (fallback) artworkCache.set(cacheKey, fallback);
   return fallback;
 }
 
 /**
- * Synchronous: get best known YouTube thumbnail URL without probing
+ * Synchronous: get best known artwork URL without probing
  */
 export function getQuickHDArtwork(trackId: string, originalUrl?: string): string {
   const cacheKey = trackId || originalUrl || '';

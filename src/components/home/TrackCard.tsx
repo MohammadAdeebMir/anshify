@@ -16,7 +16,7 @@ export const TrackCard = ({ track, tracks, index = 0 }: TrackCardProps) => {
   const { play, pause, currentTrack, isPlaying } = usePlayer();
   const isActive = currentTrack?.id === track.id;
   const [imgLoaded, setImgLoaded] = useState(false);
-  const hdArtwork = useHDArtwork(track.id, track.album_image);
+  const hdArtwork = useHDArtwork(track.id, track.album_image, track.name, track.artist_name);
 
   const handleClick = () => {
     if (isActive && isPlaying) {

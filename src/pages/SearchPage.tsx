@@ -281,6 +281,7 @@ const SearchPage = () => {
   const { user } = useAuth();
   const { theme } = useTheme();
 
+  // Debounce for full results (2+ chars)
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedQuery(query);
@@ -292,7 +293,21 @@ const SearchPage = () => {
     return () => clearTimeout(timer);
   }, [query]);
 
-  // Search results
+  // Instant suggestions (1+ chars, faster debounce)
+  const [suggestQuery, setSuggestQuery] = useState('');
+  useEffect(() => {
+    const timer = setTimeout(() => setSuggestQuery(query), 200);
+    return () => clearTimeout(timer);
+  }, [query]);
+
+  const { data: suggestions, isLoading: loadingSuggestions } = useQuery({
+    queryKey: ['yt-suggest', suggestQuery],
+    queryFn: () => searchYTMusic(suggestQuery, 5),
+    enabled: suggestQuery.length >= 1 && suggestQuery.length < 2 && isOnline,
+    staleTime: 2 * 60 * 1000,
+  });
+
+  // Search results (2+ chars)
   const { data: ytResults, isLoading: ytLoading, error: ytError, refetch: retrySearch } = useQuery({
     queryKey: ['yt-search', debouncedQuery],
     queryFn: () => searchYTMusic(debouncedQuery, 20, true),
@@ -326,7 +341,9 @@ const SearchPage = () => {
   });
 
   const showResults = debouncedQuery.length >= 2;
-  const showDiscovery = !showResults;
+  const showSuggestions = query.length >= 1 && !showResults;
+  const showRecentDropdown = isFocused && query.length === 0 && recents.length > 0;
+  const showDiscovery = !showResults && !showSuggestions && !showRecentDropdown;
 
   const handleRecentClick = useCallback((q: string) => {
     setQuery(q);
@@ -424,7 +441,107 @@ const SearchPage = () => {
         <div className="px-4 sm:px-6 pt-1">
           <div className="max-w-5xl mx-auto space-y-8">
 
-            {/* Search results */}
+            {/* Recent searches dropdown (when focused, empty query) */}
+            <AnimatePresence mode="wait">
+              {showRecentDropdown && (
+                <motion.div key="recents-drop" initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }} transition={{ duration: 0.2 }}>
+                  <div className="flex items-center justify-between mb-2">
+                    <h2 className="text-[15px] font-bold text-foreground">Recent Searches</h2>
+                    <button onClick={handleClearRecents} className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors">
+                      <Trash2 className="h-3 w-3" /> Clear all
+                    </button>
+                  </div>
+                  <div className="glass rounded-2xl overflow-hidden divide-y divide-border/10">
+                    {recents.slice(0, 8).map((r, i) => (
+                      <motion.button
+                        key={`rd-${r.query}-${i}`}
+                        initial={{ opacity: 0, x: -6 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: i * 0.03 }}
+                        onClick={() => handleRecentClick(r.query)}
+                        className="flex items-center gap-3 w-full p-3 text-left hover:bg-muted/30 active:scale-[0.99] transition-all"
+                      >
+                        <div className="h-10 w-10 rounded-xl overflow-hidden flex-shrink-0">
+                          {r.track?.image ? (
+                            <ImgFade src={r.track.image} alt={r.query} className="h-full w-full" />
+                          ) : (
+                            <div className="h-full w-full bg-secondary/50 flex items-center justify-center">
+                              <Clock className="h-4 w-4 text-muted-foreground/40" />
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[13px] font-semibold text-foreground truncate">{r.track?.name || r.query}</p>
+                          <p className="text-[11px] text-muted-foreground truncate">{r.track?.artist || 'Search'}</p>
+                        </div>
+                        <Clock className="h-3.5 w-3.5 text-muted-foreground/30 flex-shrink-0" />
+                      </motion.button>
+                    ))}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* Live suggestions (1 char typed, before full results) */}
+            <AnimatePresence mode="wait">
+              {showSuggestions && (
+                <motion.div key="suggestions" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}>
+                  <h2 className="text-[15px] font-bold text-foreground mb-2">
+                    {loadingSuggestions ? 'Searching…' : `Popular for "${query}"`}
+                  </h2>
+                  {loadingSuggestions ? (
+                    <div className="glass rounded-2xl overflow-hidden">
+                      {Array.from({ length: 4 }).map((_, i) => (
+                        <div key={i} className="flex items-center gap-3 p-3">
+                          <div className="h-10 w-10 rounded-xl shimmer flex-shrink-0" />
+                          <div className="flex-1 space-y-1.5">
+                            <div className="h-3 w-3/5 rounded shimmer" />
+                            <div className="h-2.5 w-2/5 rounded shimmer" />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : suggestions && suggestions.length > 0 ? (
+                    <div className="glass rounded-2xl overflow-hidden divide-y divide-border/10">
+                      {suggestions.map((track, i) => (
+                        <motion.button
+                          key={track.id}
+                          initial={{ opacity: 0, x: -6 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: i * 0.04 }}
+                          onClick={() => { setQuery(track.name); }}
+                          className="flex items-center gap-3 w-full p-3 text-left hover:bg-muted/30 active:scale-[0.99] transition-all group"
+                        >
+                          <div className="relative h-10 w-10 rounded-xl overflow-hidden flex-shrink-0">
+                            {track.album_image ? (
+                              <ImgFade src={track.album_image} alt={track.name} className="h-full w-full" />
+                            ) : (
+                              <div className="h-full w-full bg-secondary/50 flex items-center justify-center">
+                                <Music2 className="h-4 w-4 text-muted-foreground/40" />
+                              </div>
+                            )}
+                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center">
+                              <Play className="h-3.5 w-3.5 text-white opacity-0 group-hover:opacity-100 transition-opacity ml-0.5" />
+                            </div>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[13px] font-semibold text-foreground truncate">{track.name}</p>
+                            <p className="text-[11px] text-muted-foreground truncate">{track.artist_name}</p>
+                          </div>
+                          <Search className="h-3.5 w-3.5 text-muted-foreground/30 flex-shrink-0" />
+                        </motion.button>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="glass rounded-2xl p-6 text-center">
+                      <p className="text-sm text-muted-foreground">Keep typing to find songs…</p>
+                    </div>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* Full search results (2+ chars) */}
             <AnimatePresence mode="wait">
               {showResults && (
                 <motion.div key="results" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }}>
@@ -439,9 +556,6 @@ const SearchPage = () => {
                 </motion.div>
               )}
             </AnimatePresence>
-
-
-
 
             {/* Discovery sections */}
             {showDiscovery && (

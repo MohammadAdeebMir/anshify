@@ -221,8 +221,8 @@
   background: hsl(var(--muted-foreground) / 0.4);
 }
 
-/* Marquee scroll for long text */
+/* Marquee scroll for long text — pause then scroll */
 @keyframes marquee-scroll {
-  0% { transform: translateX(0); }
+  0%, 30% { transform: translateX(0); }
   100% { transform: translateX(-50%); }
 }

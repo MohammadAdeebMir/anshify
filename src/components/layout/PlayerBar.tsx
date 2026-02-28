@@ -53,7 +53,7 @@ const MarqueeText = memo(({ text, className, forceScroll = false }: { text: stri
         style={
           shouldScroll
             ? {
-                animation: `marquee-scroll ${scrollDuration}s linear 1.2s infinite`,
+                animation: `marquee-scroll ${scrollDuration + 3}s ease-in-out 0s infinite`,
                 willChange: 'transform',
               }
             : undefined

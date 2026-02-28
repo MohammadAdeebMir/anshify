@@ -32,11 +32,12 @@ function rgbToHsl(r: number, g: number, b: number): [number, number, number] {
   return [Math.round(h * 360), Math.round(s * 100), Math.round(l * 100)];
 }
 
-/** Snap to pure absolute colors — true red, blue, green etc. */
+/** Snap to pure, rich hue colors with proper depth */
 function adjustColor(r: number, g: number, b: number): [number, number, number] {
-  const [h] = rgbToHsl(r, g, b);
-  // Pure hue, full saturation, perfect brightness — no muted shades
-  return hslToRgb(h, 100, 50);
+  const [h, s] = rgbToHsl(r, g, b);
+  // Use exact hue, boost saturation to full, lightness at 45 for rich deep tones
+  const adjS = Math.max(s, 100);
+  return hslToRgb(h, adjS, 45);
 }
 
 function hslToRgb(h: number, s: number, l: number): [number, number, number] {

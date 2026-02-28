@@ -187,19 +187,19 @@ const Index = () => {
             className="absolute inset-0 animate-[glow-pulse_8s_ease-in-out_infinite]"
             style={{
               background: `
-                radial-gradient(ellipse 60% 50% at 0% 0%, hsl(210 100% 50% / 0.25) 0%, transparent 60%),
-                radial-gradient(ellipse 50% 45% at 100% 0%, hsl(215 95% 55% / 0.20) 0%, transparent 55%),
-                radial-gradient(ellipse 55% 50% at 100% 100%, hsl(210 100% 50% / 0.22) 0%, transparent 55%),
-                radial-gradient(ellipse 50% 45% at 0% 100%, hsl(205 90% 55% / 0.18) 0%, transparent 55%)
+                radial-gradient(ellipse 65% 55% at 0% 0%, hsl(210 100% 55% / 0.40) 0%, transparent 60%),
+                radial-gradient(ellipse 55% 50% at 100% 0%, hsl(215 100% 58% / 0.35) 0%, transparent 55%),
+                radial-gradient(ellipse 60% 55% at 100% 100%, hsl(210 100% 55% / 0.38) 0%, transparent 55%),
+                radial-gradient(ellipse 55% 50% at 0% 100%, hsl(205 95% 58% / 0.32) 0%, transparent 55%)
               `,
             }}
           />
-          {/* Golden center fading outward */}
+          {/* Golden center */}
           <div
             className="absolute inset-0 animate-[glow-pulse_10s_ease-in-out_2s_infinite]"
             style={{
               background: `
-                radial-gradient(ellipse 70% 55% at 50% 45%, hsl(42 90% 52% / 0.22) 0%, hsl(38 85% 48% / 0.10) 35%, transparent 65%)
+                radial-gradient(ellipse 75% 60% at 50% 45%, hsl(42 95% 55% / 0.35) 0%, hsl(38 90% 50% / 0.15) 35%, transparent 65%)
               `,
             }}
           />

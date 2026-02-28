@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, memo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, X, Clock, Trash2, Play, Pause, Flame, Music2 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
-import { searchYTMusic, getTracksByGenreYT, getTrendingYT } from '@/services/ytmusic';
+import { searchYTMusic, getTrendingYT } from '@/services/ytmusic';
 import { usePlayer } from '@/contexts/PlayerContext';
 import { useIsOnline } from '@/hooks/useOffline';
 import { Track } from '@/types/music';
@@ -14,19 +14,13 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 
 /* ─── Constants ─────────────────────────────────────────────────── */
 
-const CATEGORIES = [
-  { name: 'Pop', gradient: 'from-rose-500/80 to-pink-600/60' },
-  { name: 'Hip Hop', gradient: 'from-amber-500/80 to-orange-600/60' },
-  { name: 'Rock', gradient: 'from-red-600/80 to-red-800/60' },
-  { name: 'Electronic', gradient: 'from-cyan-500/80 to-blue-600/60' },
-  { name: 'R&B', gradient: 'from-purple-500/80 to-violet-600/60' },
-  { name: 'Jazz', gradient: 'from-teal-500/80 to-emerald-600/60' },
-  { name: 'Classical', gradient: 'from-indigo-500/80 to-blue-700/60' },
-  { name: 'Bollywood', gradient: 'from-fuchsia-500/80 to-pink-600/60' },
-  { name: 'K-Pop', gradient: 'from-rose-400/80 to-red-500/60' },
-  { name: 'Latin', gradient: 'from-yellow-500/80 to-orange-500/60' },
-  { name: 'Country', gradient: 'from-amber-600/80 to-yellow-700/60' },
-  { name: 'Metal', gradient: 'from-slate-500/80 to-zinc-700/60' },
+const GENRE_SECTIONS = [
+  { name: 'Pop Hits', query: 'pop hits 2025 trending' },
+  { name: 'Hip Hop', query: 'hip hop rap 2025 popular' },
+  { name: 'Chill Vibes', query: 'chill lofi relaxing vibes' },
+  { name: 'Bollywood', query: 'bollywood hindi songs 2025' },
+  { name: 'Rock Classics', query: 'rock classics best songs' },
+  { name: 'R&B Soul', query: 'rnb soul smooth songs' },
 ];
 
 /* ─── Recent searches helper ───────────────────────────────────── */
@@ -230,26 +224,31 @@ const CarouselSkeleton = ({ count = 5, h = 'h-[150px]' }: { count?: number; h?: 
   </div>
 );
 
-/* ─── Category Card (modernized) ──────────────────────────────── */
-const CategoryCard = memo(({ cat, onClick }: { cat: typeof CATEGORIES[0]; onClick: () => void }) => (
-  <motion.button
-    whileTap={{ scale: 0.96 }}
-    onClick={onClick}
-    className={cn(
-      'relative overflow-hidden rounded-xl h-[60px] text-left',
-      'bg-gradient-to-br backdrop-blur-sm',
-      'shadow-md shadow-black/20 hover:shadow-lg hover:shadow-black/30',
-      'transition-shadow duration-200',
-      cat.gradient,
-    )}
-  >
-    <div className="absolute inset-0 bg-black/10 backdrop-blur-[1px]" />
-    <span className="relative z-10 absolute left-3 top-1/2 -translate-y-1/2 text-[13px] font-bold text-white drop-shadow-md">
-      {cat.name}
-    </span>
-  </motion.button>
-));
-CategoryCard.displayName = 'CategoryCard';
+/* ─── Genre Section with its own query ─────────────────────────── */
+const GenreCarousel = memo(({ genre }: { genre: typeof GENRE_SECTIONS[0] }) => {
+  const isOnline = useIsOnline();
+  const { data: tracks, isLoading } = useQuery({
+    queryKey: ['search-genre-carousel', genre.query],
+    queryFn: () => searchYTMusic(genre.query, 12),
+    staleTime: 10 * 60 * 1000,
+    enabled: isOnline,
+  });
+
+  return (
+    <Section title={genre.name}>
+      {isLoading ? (
+        <CarouselSkeleton />
+      ) : tracks && tracks.length > 0 ? (
+        <HCarousel>
+          {tracks.map(track => (
+            <TrackCard key={track.id} track={track} tracks={tracks} />
+          ))}
+        </HCarousel>
+      ) : null}
+    </Section>
+  );
+});
+GenreCarousel.displayName = 'GenreCarousel';
 
 /* ─── Background matching themes ───────────────────────────────── */
 const SearchBackground = memo(({ theme }: { theme: string }) => {
@@ -275,7 +274,6 @@ SearchBackground.displayName = 'SearchBackground';
 const SearchPage = () => {
   const [query, setQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
-  const [selectedGenre, setSelectedGenre] = useState<string | null>(null);
   const [recents, setRecents] = useState<RecentItem[]>(getRecents());
   const [isFocused, setIsFocused] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -311,14 +309,6 @@ const SearchPage = () => {
     }
   }, [ytResults, debouncedQuery]);
 
-  // Genre results
-  const { data: genreTracks, isLoading: loadingGenre } = useQuery({
-    queryKey: ['genre-yt', selectedGenre],
-    queryFn: () => getTracksByGenreYT(selectedGenre!, 20),
-    enabled: !!selectedGenre && isOnline,
-    staleTime: 5 * 60 * 1000,
-  });
-
   // Trending tracks
   const { data: trendingTracks, isLoading: loadingTrending } = useQuery({
     queryKey: ['search-trending'],
@@ -336,22 +326,15 @@ const SearchPage = () => {
   });
 
   const showResults = debouncedQuery.length >= 2;
-  const showGenreResults = selectedGenre && !showResults;
-  const showDiscovery = !showResults && !showGenreResults;
+  const showDiscovery = !showResults;
 
   const handleRecentClick = useCallback((q: string) => {
     setQuery(q);
-    setSelectedGenre(null);
   }, []);
 
   const handleClearRecents = useCallback(() => {
     clearRecents();
     setRecents([]);
-  }, []);
-
-  const handleGenreClick = useCallback((name: string) => {
-    setSelectedGenre(name);
-    setQuery('');
   }, []);
 
   const userInitial = user?.email?.[0]?.toUpperCase() || '?';
@@ -411,7 +394,7 @@ const SearchPage = () => {
                 <input
                   ref={inputRef}
                   value={query}
-                  onChange={e => { setQuery(e.target.value); setSelectedGenre(null); }}
+                  onChange={e => { setQuery(e.target.value); }}
                   onFocus={() => setIsFocused(true)}
                   onBlur={() => setIsFocused(false)}
                   placeholder="Search songs, artists, albums…"
@@ -453,34 +436,8 @@ const SearchPage = () => {
               )}
             </AnimatePresence>
 
-            {/* Genre results */}
-            <AnimatePresence mode="wait">
-              {showGenreResults && (
-                <motion.div key="genre" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-                  <div className="flex items-center gap-3 mb-4">
-                    <h2 className="text-xl font-bold text-foreground">{selectedGenre}</h2>
-                    <button onClick={() => setSelectedGenre(null)} className="text-xs text-muted-foreground hover:text-foreground px-2.5 py-1 rounded-lg bg-secondary/50 transition-colors">
-                      ✕ Clear
-                    </button>
-                  </div>
-                  {loadingGenre ? (
-                    <div className="space-y-2">
-                      {Array.from({ length: 5 }).map((_, i) => (
-                        <div key={i} className="h-16 rounded-xl shimmer" />
-                      ))}
-                    </div>
-                  ) : genreTracks && genreTracks.length > 0 ? (
-                    <div className="rounded-2xl overflow-hidden glass">
-                      <YTSearchResults tracks={genreTracks} isLoading={false} error={null} onRetry={() => {}} query={selectedGenre!} />
-                    </div>
-                  ) : (
-                    <div className="rounded-2xl p-8 text-center glass">
-                      <p className="text-sm text-muted-foreground">No tracks found for this genre</p>
-                    </div>
-                  )}
-                </motion.div>
-              )}
-            </AnimatePresence>
+
+
 
             {/* Discovery sections */}
             {showDiscovery && (
@@ -549,14 +506,10 @@ const SearchPage = () => {
                   ) : null}
                 </Section>
 
-                {/* 4. Browse by Categories (modernized) */}
-                <Section title="Browse Categories" delay={0.15}>
-                  <div className="grid grid-cols-2 gap-2.5">
-                    {CATEGORIES.map(cat => (
-                      <CategoryCard key={cat.name} cat={cat} onClick={() => handleGenreClick(cat.name)} />
-                    ))}
-                  </div>
-                </Section>
+                {/* 4. Genre carousels — same style as above */}
+                {GENRE_SECTIONS.map(genre => (
+                  <GenreCarousel key={genre.name} genre={genre} />
+                ))}
               </>
             )}
 

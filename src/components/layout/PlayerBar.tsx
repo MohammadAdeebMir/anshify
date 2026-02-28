@@ -377,15 +377,17 @@ export const PlayerBar = () => {
   const liked = isLiked(currentTrack.id, likedSongs);
   const upcomingCount = queue.length - queueIndex - 1;
 
-  // Dynamic gradient — Spotify-style bold vertical blend (fully opaque)
+  // Dynamic gradient — Spotify-level bold vertical blend
   const { r: cr, g: cg, b: cb, sr, sg, sb } = dominantColor;
-  const accentGlow = `rgba(${cr},${cg},${cb},0.4)`;
+  const accentGlow = `rgba(${cr},${cg},${cb},0.5)`;
+  // Rich multi-stop gradient: bold top fading to deep dark bottom
   const bgGradient = `
     linear-gradient(180deg,
       rgb(${cr},${cg},${cb}) 0%,
-      rgb(${cr},${cg},${cb}) 30%,
-      rgb(${Math.round(cr*0.7)},${Math.round(cg*0.7)},${Math.round(cb*0.7)}) 55%,
-      rgb(${Math.round(cr*0.35)},${Math.round(cg*0.35)},${Math.round(cb*0.35)}) 78%,
+      rgb(${cr},${cg},${cb}) 20%,
+      rgb(${Math.round(cr*0.75)},${Math.round(cg*0.75)},${Math.round(cb*0.75)}) 40%,
+      rgb(${Math.round(cr*0.4)},${Math.round(cg*0.4)},${Math.round(cb*0.4)}) 60%,
+      rgb(${Math.round(cr*0.15)},${Math.round(cg*0.15)},${Math.round(cb*0.15)}) 80%,
       rgb(12,12,14) 100%
     )
   `;
@@ -442,13 +444,13 @@ export const PlayerBar = () => {
           className="fixed inset-0 z-50 flex flex-col overflow-hidden"
           style={{ backgroundColor: '#0a0a0c' }}
         >
-          {/* Animated background — fully opaque, no transparency leak */}
+          {/* Animated background — Spotify-level gradient */}
           <div
             className="absolute inset-0"
-            style={{ background: bgGradient, transition: 'background 450ms ease', zIndex: 0 }}
+            style={{ background: bgGradient, transition: 'background 400ms cubic-bezier(0.4,0,0.2,1)', zIndex: 0 }}
           />
-          {/* Dark overlay for readability */}
-          <div className="absolute inset-0 bg-black/[0.18]" style={{ zIndex: 0 }} />
+          {/* Subtle dark overlay for text readability without killing color */}
+          <div className="absolute inset-0 bg-black/[0.12]" style={{ zIndex: 0 }} />
 
           {/* Drag-down-to-close overlay */}
           <motion.div
@@ -479,35 +481,35 @@ export const PlayerBar = () => {
             </motion.button>
           </div>
 
-          {/* Album art — large, centered */}
-          <div className="flex-1 flex items-center justify-center px-8 relative min-h-0" style={{ zIndex: 2 }}>
+          {/* Album art — large, immersive, centered */}
+          <div className="flex-1 flex items-center justify-center px-[8%] sm:px-[10%] relative min-h-0" style={{ zIndex: 2 }}>
             <motion.div
               drag="x"
               dragConstraints={{ left: 0, right: 0 }}
               dragElastic={0.12}
               onDragEnd={handleArtworkSwipe}
               onTap={handleDoubleTap}
-              className="w-full max-w-[340px] aspect-square relative"
+              className="w-[82vw] max-w-[480px] aspect-square relative"
             >
               <AnimatePresence mode="wait">
                 <motion.div
                   key={currentTrack.id}
-                  initial={{ scale: 0.93, opacity: 0 }}
+                  initial={{ scale: 0.92, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
-                  exit={{ scale: 0.95, opacity: 0 }}
-                  transition={{ duration: 0.4, ease: [0.25, 0.1, 0.25, 1] }}
+                  exit={{ scale: 0.94, opacity: 0 }}
+                  transition={{ duration: 0.35, ease: [0.25, 0.1, 0.25, 1] }}
                   className="w-full h-full"
                 >
-                  {/* Ambient shadow */}
+                  {/* Ambient glow behind artwork */}
                   <div
-                    className="absolute -inset-6 rounded-[36px] opacity-40 blur-[40px] pointer-events-none"
+                    className="absolute -inset-8 rounded-[40px] opacity-35 blur-[50px] pointer-events-none"
                     style={{
-                      background: `radial-gradient(circle, rgba(${cr},${cg},${cb},0.6) 0%, transparent 70%)`,
-                      transition: 'background 450ms ease',
+                      background: `radial-gradient(circle, rgba(${cr},${cg},${cb},0.55) 0%, transparent 70%)`,
+                      transition: 'background 400ms cubic-bezier(0.4,0,0.2,1)',
                     }}
                   />
                   {/* Artwork card */}
-                  <div className="relative w-full h-full rounded-2xl overflow-hidden shadow-[0_12px_48px_rgba(0,0,0,0.55)]">
+                  <div className="relative w-full h-full rounded-[14px] overflow-hidden shadow-[0_16px_60px_rgba(0,0,0,0.6)]">
                     {currentTrack.album_image ? (
                       <img
                         src={currentTrack.album_image}
@@ -547,7 +549,7 @@ export const PlayerBar = () => {
           </div>
 
           {/* Track info + controls */}
-          <div className="px-8 relative pb-2" style={{ zIndex: 2, paddingBottom: 'max(env(safe-area-inset-bottom, 12px), 20px)' }}>
+          <div className="px-[8%] sm:px-8 relative pb-2" style={{ zIndex: 2, paddingBottom: 'max(env(safe-area-inset-bottom, 12px), 20px)' }}>
             {/* Song info row with like */}
             <AnimatePresence mode="wait">
               <motion.div
@@ -559,7 +561,7 @@ export const PlayerBar = () => {
                 className="flex items-start justify-between mb-4"
               >
                 <div className="min-w-0 flex-1 mr-4">
-                  <MarqueeText text={currentTrack.name} className="text-xl font-bold text-white tracking-tight leading-tight" />
+                  <MarqueeText text={currentTrack.name} className="text-[22px] font-extrabold text-white tracking-tight leading-tight" />
                   <MarqueeText text={currentTrack.artist_name} className="text-[15px] text-amber-300/70 mt-0.5 font-normal" />
                 </div>
                 {user && (
@@ -580,7 +582,7 @@ export const PlayerBar = () => {
             )}
 
             {/* Seek bar */}
-            <div className="mb-2">
+            <div className="mb-3">
               <SlimSeekBar progress={progress} duration={duration} onSeek={player.seek} isBuffering={isBuffering} accentColor={accentGlow} />
             </div>
 

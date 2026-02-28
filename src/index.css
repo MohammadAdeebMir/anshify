@@ -5,23 +5,24 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
 
 @layer base {
+  /* ─── Default: Premium dark with subtle golden warmth ─── */
   :root {
-    --background: 0 0% 2%;
+    --background: 240 6% 5%;
     --foreground: 0 0% 95%;
 
-    --card: 0 0% 5%;
+    --card: 240 5% 7%;
     --card-foreground: 0 0% 95%;
 
-    --popover: 0 0% 5%;
+    --popover: 240 5% 7%;
     --popover-foreground: 0 0% 95%;
 
     --primary: 0 0% 100%;
     --primary-foreground: 0 0% 0%;
 
-    --secondary: 0 0% 8%;
+    --secondary: 240 4% 10%;
     --secondary-foreground: 0 0% 85%;
 
-    --muted: 0 0% 10%;
+    --muted: 240 4% 12%;
     --muted-foreground: 0 0% 50%;
 
     --accent: 0 0% 85%;
@@ -30,34 +31,34 @@
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 98%;
 
-    --border: 0 0% 12%;
-    --input: 0 0% 12%;
+    --border: 240 4% 14%;
+    --input: 240 4% 14%;
     --ring: 0 0% 70%;
 
     --radius: 1rem;
 
-    --sidebar-background: 0 0% 3%;
+    --sidebar-background: 240 6% 4%;
     --sidebar-foreground: 0 0% 60%;
     --sidebar-primary: 0 0% 100%;
     --sidebar-primary-foreground: 0 0% 0%;
-    --sidebar-accent: 0 0% 8%;
+    --sidebar-accent: 240 4% 10%;
     --sidebar-accent-foreground: 0 0% 85%;
-    --sidebar-border: 0 0% 10%;
+    --sidebar-border: 240 4% 12%;
     --sidebar-ring: 0 0% 70%;
 
     /* Custom tokens */
-    --purple-glow: 0 0% 40%;
-    --magenta: 0 0% 30%;
-    --deep-violet: 0 0% 1%;
-    --glass: 0 0% 6%;
-    --glass-border: 0 0% 14%;
-    --shimmer: 0 0% 15%;
-    --surface-elevated: 0 0% 7%;
-    --glow-soft: 0 0% 60%;
+    --purple-glow: 35 30% 40%;
+    --magenta: 30 25% 30%;
+    --deep-violet: 240 6% 3%;
+    --glass: 240 5% 8%;
+    --glass-border: 240 4% 16%;
+    --shimmer: 35 15% 15%;
+    --surface-elevated: 240 5% 9%;
+    --glow-soft: 35 40% 55%;
   }
 
-  /* AMOLED Pure Black */
-  [data-theme="amoled"] {
+  /* ─── Pure OLED: True black ─── */
+  [data-theme="oled"] {
     --background: 0 0% 0%;
     --foreground: 0 0% 95%;
     --card: 0 0% 3%;
@@ -74,6 +75,10 @@
     --glass-border: 0 0% 10%;
     --deep-violet: 0 0% 0%;
     --surface-elevated: 0 0% 4%;
+    --purple-glow: 0 0% 20%;
+    --magenta: 0 0% 15%;
+    --shimmer: 0 0% 8%;
+    --glow-soft: 0 0% 30%;
     --sidebar-background: 0 0% 0%;
     --sidebar-foreground: 0 0% 55%;
     --sidebar-accent: 0 0% 6%;
@@ -81,41 +86,36 @@
     --sidebar-border: 0 0% 6%;
   }
 
-  /* Midnight Blue */
-  [data-theme="midnight"] {
-    --background: 220 30% 4%;
-    --foreground: 220 20% 95%;
-    --card: 220 25% 7%;
-    --card-foreground: 220 20% 95%;
-    --popover: 220 25% 7%;
-    --popover-foreground: 220 20% 95%;
-    --primary: 210 90% 55%;
-    --primary-foreground: 0 0% 100%;
-    --secondary: 220 20% 10%;
-    --secondary-foreground: 220 15% 85%;
-    --muted: 220 15% 11%;
-    --muted-foreground: 220 10% 45%;
-    --accent: 200 70% 50%;
-    --accent-foreground: 0 0% 100%;
-    --border: 220 15% 13%;
-    --input: 220 15% 13%;
-    --ring: 210 90% 55%;
-    --glass: 220 20% 7%;
-    --glass-border: 220 15% 15%;
-    --purple-glow: 210 90% 55%;
-    --magenta: 200 70% 50%;
-    --deep-violet: 220 30% 3%;
-    --shimmer: 210 30% 15%;
-    --surface-elevated: 220 20% 9%;
-    --glow-soft: 210 85% 50%;
-    --sidebar-background: 220 25% 5%;
-    --sidebar-foreground: 220 10% 55%;
-    --sidebar-primary: 210 90% 55%;
-    --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 220 20% 10%;
-    --sidebar-accent-foreground: 220 15% 85%;
-    --sidebar-border: 220 15% 10%;
-    --sidebar-ring: 210 90% 55%;
+  /* ─── Obsidian: Deep neutral dark, cool tones ─── */
+  [data-theme="obsidian"] {
+    --background: 240 8% 4%;
+    --foreground: 240 5% 95%;
+    --card: 240 7% 6%;
+    --card-foreground: 240 5% 95%;
+    --popover: 240 7% 6%;
+    --popover-foreground: 240 5% 95%;
+    --secondary: 240 6% 9%;
+    --secondary-foreground: 240 3% 85%;
+    --muted: 240 5% 10%;
+    --muted-foreground: 240 3% 48%;
+    --border: 240 5% 12%;
+    --input: 240 5% 12%;
+    --glass: 240 6% 6%;
+    --glass-border: 240 5% 14%;
+    --deep-violet: 240 8% 2%;
+    --surface-elevated: 240 6% 8%;
+    --purple-glow: 240 8% 30%;
+    --magenta: 240 6% 22%;
+    --shimmer: 240 6% 12%;
+    --glow-soft: 240 10% 45%;
+    --sidebar-background: 240 8% 3%;
+    --sidebar-foreground: 240 4% 55%;
+    --sidebar-primary: 0 0% 100%;
+    --sidebar-primary-foreground: 0 0% 0%;
+    --sidebar-accent: 240 6% 9%;
+    --sidebar-accent-foreground: 240 3% 85%;
+    --sidebar-border: 240 5% 9%;
+    --sidebar-ring: 240 6% 50%;
   }
 }
 
@@ -154,15 +154,34 @@
 
   .gradient-bg {
     background:
-      radial-gradient(circle at 20% 20%, hsl(200 80% 50% / 0.08), transparent 40%),
-      radial-gradient(circle at 80% 80%, hsl(30 90% 50% / 0.06), transparent 40%),
-      linear-gradient(180deg, hsl(0 0% 4%) 0%, hsl(0 0% 2%) 100%);
+      radial-gradient(circle at 25% 15%, hsl(35 30% 50% / 0.04), transparent 45%),
+      radial-gradient(circle at 75% 80%, hsl(25 25% 45% / 0.03), transparent 45%),
+      linear-gradient(180deg, hsl(var(--background)) 0%, hsl(var(--background)) 100%);
+  }
+
+  [data-theme="oled"] .gradient-bg {
+    background: hsl(var(--background));
+  }
+
+  [data-theme="obsidian"] .gradient-bg {
+    background:
+      radial-gradient(circle at 30% 20%, hsl(240 10% 50% / 0.03), transparent 45%),
+      linear-gradient(180deg, hsl(var(--background)) 0%, hsl(var(--background)) 100%);
   }
 
   .gradient-radial {
     background:
-      radial-gradient(ellipse at 70% 15%, hsl(200 70% 50% / 0.05) 0%, transparent 55%),
-      radial-gradient(ellipse at 20% 85%, hsl(30 80% 50% / 0.04) 0%, transparent 45%);
+      radial-gradient(ellipse at 70% 15%, hsl(35 25% 50% / 0.03) 0%, transparent 55%),
+      radial-gradient(ellipse at 20% 85%, hsl(25 20% 45% / 0.02) 0%, transparent 45%);
+  }
+
+  [data-theme="oled"] .gradient-radial {
+    background: transparent;
+  }
+
+  [data-theme="obsidian"] .gradient-radial {
+    background:
+      radial-gradient(ellipse at 60% 20%, hsl(240 8% 45% / 0.03) 0%, transparent 50%);
   }
 
   .shimmer {

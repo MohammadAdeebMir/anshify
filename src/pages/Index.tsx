@@ -20,6 +20,9 @@ import { DailyMixCard } from '@/components/home/DailyMixCard';
 import { useState, memo, useCallback } from 'react';
 import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { NotificationBell } from '@/components/NotificationBell';
+import { useNavigate } from 'react-router-dom';
+import appLogo from '@/assets/logo.png';
 
 /* ─── Filter Pills ─────────────────────────────────────────────── */
 const FILTERS = ['All', 'Music', 'Podcasts'] as const;
@@ -145,6 +148,7 @@ function useFallbackSections() {
 const Index = () => {
   const { theme } = useTheme();
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [filter, setFilter] = useState<Filter>('All');
   const { recentlyPlayed, isLoading: loadingRecent } = useRecentlyPlayed();
   const { data: trending, isLoading: loadingTrending } = useQuery({
@@ -189,15 +193,34 @@ const Index = () => {
             backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
           }}
         >
-          <div className="flex items-center gap-3">
-            {/* Profile circle */}
-            <Avatar className="h-8 w-8 flex-shrink-0 ring-2 ring-border/30">
-              <AvatarFallback className="bg-secondary text-secondary-foreground text-xs font-bold">
-                {user?.email?.[0]?.toUpperCase() || 'U'}
-              </AvatarFallback>
-            </Avatar>
-            <FilterPills active={filter} onChange={handleFilterChange} />
+          {/* ── Brand Row: Logo + Name | Bell + Avatar ── */}
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2.5">
+              <img
+                src={appLogo}
+                alt="Anshify"
+                className="h-[30px] w-auto object-contain flex-shrink-0 brightness-[1.8] invert"
+                style={{ imageRendering: 'auto' }}
+              />
+              <span className="text-[19px] font-semibold tracking-wide" style={{ color: '#BABABA' }}>
+                Anshify
+              </span>
+            </div>
+            <div className="flex items-center gap-1">
+              <NotificationBell />
+              <button
+                onClick={() => navigate('/profile')}
+                className="p-1"
+              >
+                <Avatar className="h-[34px] w-[34px] ring-1 ring-border/20">
+                  <AvatarFallback className="bg-secondary text-secondary-foreground text-xs font-bold">
+                    {user?.email?.[0]?.toUpperCase() || 'U'}
+                  </AvatarFallback>
+                </Avatar>
+              </button>
+            </div>
           </div>
+          <FilterPills active={filter} onChange={handleFilterChange} />
         </div>
 
         {/* ── Main Content ── */}

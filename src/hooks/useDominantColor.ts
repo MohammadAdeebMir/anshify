@@ -38,17 +38,16 @@ function adjustColor(r: number, g: number, b: number): [number, number, number] 
 
   // Bright target range so gradients feel colorful, not muddy
   let adjL = l;
-  if (l > 92) adjL = 86 + (l - 92) * 0.2;
-  else if (l < 35) adjL = 52 + l * 0.6; // lift dark artwork strongly
-  else adjL = Math.max(62, Math.min(88, l));
+  if (l > 95) adjL = 92 + (l - 95) * 0.2;
+  else if (l < 40) adjL = 58 + l * 0.7; // lift darks hard
+  else adjL = Math.max(70, Math.min(95, l)); // bright range 70-95
 
-  // Strong but tasteful saturation
+  // Max saturation — deep & vivid
   let adjS = s;
-  if (s < 40) adjS = s + 30;
-  else if (s > 97) adjS = 88 + (s - 97) * 0.2;
-  else adjS = Math.max(s, 90);
+  if (s < 50) adjS = s + 50;
+  else adjS = Math.max(s, 100);
 
-  return hslToRgb(h, Math.min(adjS, 95), Math.min(adjL, 90));
+  return hslToRgb(h, Math.min(adjS, 100), Math.min(adjL, 95));
 }
 
 function hslToRgb(h: number, s: number, l: number): [number, number, number] {

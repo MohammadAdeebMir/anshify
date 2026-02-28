@@ -22,7 +22,6 @@ export const AppLayout = () => {
 
       <div className="flex-1 flex flex-col overflow-hidden relative z-10">
         <OfflineBanner />
-        <OfflineBanner />
         <main className={cn(
           'flex-1 overflow-y-auto',
           hasPlayer ? 'pb-36 md:pb-24' : 'pb-16 md:pb-0'

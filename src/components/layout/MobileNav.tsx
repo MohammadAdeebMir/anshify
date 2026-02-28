@@ -1,13 +1,13 @@
-import { Home, Search, Radio, Library, User } from 'lucide-react';
+import { Home, Search, Radio, Library, Plus } from 'lucide-react';
 import { NavLink } from '@/components/NavLink';
 import { cn } from '@/lib/utils';
 
 const tabs = [
   { title: 'Home', to: '/', icon: Home },
   { title: 'Search', to: '/search', icon: Search },
+  { title: 'Create', to: '/create', icon: Plus },
   { title: 'Browse', to: '/browse', icon: Radio },
   { title: 'Library', to: '/library', icon: Library },
-  { title: 'Profile', to: '/profile', icon: User },
 ];
 
 export const MobileNav = () => (

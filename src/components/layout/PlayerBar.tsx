@@ -11,7 +11,7 @@ import { motion, AnimatePresence, PanInfo } from 'framer-motion';
 import { useState, useRef, useCallback, useEffect, memo, useMemo } from 'react';
 
 /* ─── Marquee Text ───────────────────────────────────────────────── */
-const MARQUEE_PAUSE = 5; // seconds to show full name before scrolling
+const MARQUEE_PAUSE = 5; // seconds to pause AFTER scroll completes
 
 const MarqueeText = memo(({ text, className, forceScroll = false, syncDuration }: { text: string; className?: string; forceScroll?: boolean; syncDuration?: number }) => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -37,10 +37,10 @@ const MarqueeText = memo(({ text, className, forceScroll = false, syncDuration }
   }, [text, forceScroll, syncDuration]);
 
   const moveDur = syncDuration || scrollDuration;
-  // Total cycle = pause + scroll
-  const totalDur = MARQUEE_PAUSE + moveDur;
-  // Percentage of total time spent paused
-  const pausePercent = ((MARQUEE_PAUSE / totalDur) * 100).toFixed(1);
+  // Total cycle = scroll + pause at end
+  const totalDur = moveDur + MARQUEE_PAUSE;
+  // Scroll finishes at this percentage, then hold until 100%
+  const scrollEndPercent = ((moveDur / totalDur) * 100).toFixed(1);
 
   return (
     <div
@@ -63,8 +63,6 @@ const MarqueeText = memo(({ text, className, forceScroll = false, syncDuration }
             ? {
                 animation: `marquee-dynamic ${totalDur}s linear infinite`,
                 willChange: 'transform',
-                // Inject dynamic keyframes via CSS custom property workaround
-                // We use inline keyframe trick below
               }
             : undefined
         }
@@ -79,7 +77,8 @@ const MarqueeText = memo(({ text, className, forceScroll = false, syncDuration }
       {shouldScroll && (
         <style>{`
           @keyframes marquee-dynamic {
-            0%, ${pausePercent}% { transform: translateX(0); }
+            0% { transform: translateX(0); }
+            ${scrollEndPercent}% { transform: translateX(-50%); }
             100% { transform: translateX(-50%); }
           }
         `}</style>

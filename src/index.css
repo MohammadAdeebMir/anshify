@@ -226,17 +226,8 @@
   background: hsl(var(--muted-foreground) / 0.4);
 }
 
-/* Marquee: hold still for var(--marquee-pause), then smooth scroll */
+/* Marquee keyframes — dynamic version injected via inline <style> in PlayerBar */
 @keyframes marquee-scroll {
-  0% { transform: translateX(0); }
-  var(--_placeholder) { transform: translateX(0); } /* fallback overridden by JS */
-  100% { transform: translateX(-50%); }
-}
-/* We use a two-animation approach instead: pause + scroll */
-@keyframes marquee-pause {
-  0%, 100% { transform: translateX(0); }
-}
-@keyframes marquee-move {
   0% { transform: translateX(0); }
   100% { transform: translateX(-50%); }
 }

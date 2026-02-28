@@ -1,17 +1,18 @@
 /**
  * Ultra HD Artwork Utility
- * Smart artwork pipeline with YouTube thumbnail fallback chain
+ * Smart multi-source artwork pipeline:
+ * YouTube HD → iTunes/Apple Music → fallback
  */
 
 const artworkCache = new Map<string, string>();
 const failedUrls = new Set<string>();
+const itunesCache = new Map<string, string | null>();
 
 /**
  * Extract video ID from various YouTube URL formats or raw ID
  */
 function extractVideoId(input: string): string | null {
   if (!input) return null;
-  // Already a plain video ID (11 chars, alphanumeric + dash/underscore)
   if (/^[a-zA-Z0-9_-]{11}$/.test(input)) return input;
   try {
     const url = new URL(input);
@@ -56,7 +57,6 @@ function probeImage(url: string, minSize = 200): Promise<{ url: string; width: n
     
     img.onload = () => {
       clearTimeout(timeout);
-      // YouTube returns a 120x90 gray placeholder for missing thumbnails
       if (img.naturalWidth < minSize || img.naturalHeight < minSize) {
         failedUrls.add(url);
         resolve(null);
@@ -74,14 +74,77 @@ function probeImage(url: string, minSize = 200): Promise<{ url: string; width: n
 }
 
 /**
+ * Fetch HD artwork from iTunes Search API
+ * Returns 1000x1000 artwork URL or null
+ */
+async function fetchITunesArtwork(trackName: string, artistName: string): Promise<string | null> {
+  const cacheKey = `${trackName}::${artistName}`.toLowerCase();
+  if (itunesCache.has(cacheKey)) return itunesCache.get(cacheKey) || null;
+
+  try {
+    const query = encodeURIComponent(`${trackName} ${artistName}`);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 3000);
+    
+    const res = await fetch(
+      `https://itunes.apple.com/search?term=${query}&entity=song&limit=3`,
+      { signal: controller.signal }
+    );
+    clearTimeout(timeout);
+    
+    if (!res.ok) {
+      itunesCache.set(cacheKey, null);
+      return null;
+    }
+    
+    const data = await res.json();
+    if (!data.results || data.results.length === 0) {
+      itunesCache.set(cacheKey, null);
+      return null;
+    }
+
+    // Find best match
+    const normalizedTrack = trackName.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const normalizedArtist = artistName.toLowerCase().replace(/[^a-z0-9]/g, '');
+    
+    let bestResult = data.results[0];
+    for (const result of data.results) {
+      const rTrack = (result.trackName || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+      const rArtist = (result.artistName || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+      if (rTrack.includes(normalizedTrack) || normalizedTrack.includes(rTrack)) {
+        if (rArtist.includes(normalizedArtist) || normalizedArtist.includes(rArtist)) {
+          bestResult = result;
+          break;
+        }
+      }
+    }
+
+    const artworkUrl = bestResult.artworkUrl100;
+    if (!artworkUrl) {
+      itunesCache.set(cacheKey, null);
+      return null;
+    }
+
+    // Upgrade to 1000x1000
+    const hdUrl = artworkUrl.replace(/100x100bb/, '1000x1000bb');
+    itunesCache.set(cacheKey, hdUrl);
+    return hdUrl;
+  } catch {
+    itunesCache.set(cacheKey, null);
+    return null;
+  }
+}
+
+/**
  * Get the best available artwork URL for a track
- * Tries YouTube HD thumbnails first, falls back to original
+ * Priority: YouTube HD → iTunes HD → original
  */
 export async function getHDArtwork(
   trackId: string,
   originalUrl?: string,
+  trackName?: string,
+  artistName?: string,
 ): Promise<string> {
-  // Check cache
   const cacheKey = trackId || originalUrl || '';
   const cached = artworkCache.get(cacheKey);
   if (cached) return cached;
@@ -92,14 +155,28 @@ export async function getHDArtwork(
     return originalUrl;
   }
 
-  // Try to extract video ID from track ID (which is usually the YouTube video ID)
+  // Try to extract video ID from track ID
   const videoId = extractVideoId(trackId);
   
   if (videoId) {
     // Try YouTube thumbnails in quality order
     for (const quality of YT_THUMB_QUALITIES) {
       const url = getYouTubeThumbnailUrl(videoId, quality);
-      const result = await probeImage(url, quality === 'maxresdefault' ? 400 : 200);
+      const minSize = quality === 'maxresdefault' ? 400 : quality === 'sddefault' ? 300 : 200;
+      const result = await probeImage(url, minSize);
+      if (result) {
+        artworkCache.set(cacheKey, result.url);
+        return result.url;
+      }
+    }
+  }
+
+  // Try iTunes Search API as fallback
+  if (trackName && artistName) {
+    const itunesUrl = await fetchITunesArtwork(trackName, artistName);
+    if (itunesUrl) {
+      // Probe to confirm it loads
+      const result = await probeImage(itunesUrl, 400);
       if (result) {
         artworkCache.set(cacheKey, result.url);
         return result.url;
@@ -115,17 +192,14 @@ export async function getHDArtwork(
 
 /**
  * Synchronous: get best known YouTube thumbnail URL without probing
- * Use this for immediate rendering, then upgrade with getHDArtwork async
  */
 export function getQuickHDArtwork(trackId: string, originalUrl?: string): string {
   const cacheKey = trackId || originalUrl || '';
   const cached = artworkCache.get(cacheKey);
   if (cached) return cached;
 
-  // If original is already HD
   if (originalUrl?.includes('maxresdefault')) return originalUrl;
 
-  // Try to construct HD URL from video ID
   const videoId = extractVideoId(trackId);
   if (videoId) {
     return getYouTubeThumbnailUrl(videoId, 'hqdefault');
@@ -137,8 +211,8 @@ export function getQuickHDArtwork(trackId: string, originalUrl?: string): string
 /**
  * Preload artwork for upcoming tracks
  */
-export function preloadArtwork(trackId: string, originalUrl?: string): void {
-  getHDArtwork(trackId, originalUrl).then((url) => {
+export function preloadArtwork(trackId: string, originalUrl?: string, trackName?: string, artistName?: string): void {
+  getHDArtwork(trackId, originalUrl, trackName, artistName).then((url) => {
     if (url) {
       const img = new Image();
       img.src = url;

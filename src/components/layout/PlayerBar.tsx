@@ -481,8 +481,13 @@ export const PlayerBar = () => {
             </div>
           </div>
 
-          {/* ── Album art — large, immersive, centered ── */}
-          <div className="flex-1 flex items-center justify-center px-[8%] relative min-h-0 py-4" style={{ zIndex: 2 }}>
+          {/* ── Album art — large, immersive, centered with cinematic entrance ── */}
+          <motion.div
+            initial={{ scale: 0.85, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ type: 'spring', stiffness: 200, damping: 22, mass: 0.8, delay: 0.1 }}
+            className="flex-1 flex items-center justify-center px-[8%] relative min-h-0 py-4" style={{ zIndex: 2 }}
+          >
             <motion.div
               drag="x"
               dragConstraints={{ left: 0, right: 0 }}
@@ -545,7 +550,7 @@ export const PlayerBar = () => {
                 )}
               </AnimatePresence>
             </motion.div>
-          </div>
+          </motion.div>
 
           {/* ── Track info + controls bottom section ── */}
           <div className="relative px-[8%]" style={{ zIndex: 2, paddingBottom: 'max(env(safe-area-inset-bottom, 12px), 16px)' }}>
@@ -560,7 +565,7 @@ export const PlayerBar = () => {
                 transition={{ duration: 0.3 }}
                 className="flex items-center justify-between mb-5"
               >
-                <div className="min-w-0 flex-1 mr-3">
+                <div className="min-w-0 flex-1 mr-3" style={{ textShadow: `0 0 24px rgba(${cr},${cg},${cb},0.35), 0 0 48px rgba(${cr},${cg},${cb},0.12)`, transition: 'text-shadow 400ms ease' }}>
                   <MarqueeText text={currentTrack.name} className="text-[20px] font-bold text-white tracking-tight leading-tight" />
                   <MarqueeText text={currentTrack.artist_name} className="text-[14px] text-white/50 mt-0.5 font-normal" />
                 </div>
@@ -600,11 +605,12 @@ export const PlayerBar = () => {
                 transition={{ type: 'spring', stiffness: 500, damping: 20, mass: 0.6 }}
                 onClick={player.toggleShuffle}
                 className={cn(
-                  'h-[52px] w-[52px] rounded-2xl flex items-center justify-center transition-all duration-150',
+                  'h-[52px] w-[52px] rounded-2xl flex flex-col items-center justify-center transition-all duration-150 relative',
                   'bg-white/[0.06] active:bg-white/[0.14] backdrop-blur-sm',
                   shuffle ? 'text-white' : 'text-white/40'
                 )}>
                 <Shuffle className="h-[20px] w-[20px]" />
+                {shuffle && <span className="absolute bottom-1.5 w-1 h-1 rounded-full bg-white" />}
               </motion.button>
 
               <motion.button
@@ -632,11 +638,12 @@ export const PlayerBar = () => {
                 transition={{ type: 'spring', stiffness: 500, damping: 20, mass: 0.6 }}
                 onClick={player.toggleRepeat}
                 className={cn(
-                  'h-[52px] w-[52px] rounded-2xl flex items-center justify-center transition-all duration-150',
+                  'h-[52px] w-[52px] rounded-2xl flex flex-col items-center justify-center transition-all duration-150 relative',
                   'bg-white/[0.06] active:bg-white/[0.14] backdrop-blur-sm',
                   repeat !== 'off' ? 'text-white' : 'text-white/40'
                 )}>
                 {repeat === 'one' ? <Repeat1 className="h-[20px] w-[20px]" /> : <Repeat className="h-[20px] w-[20px]" />}
+                {repeat !== 'off' && <span className="absolute bottom-1.5 w-1 h-1 rounded-full bg-white" />}
               </motion.button>
             </div>
 

@@ -181,20 +181,24 @@ const Index = () => {
       {/* ── Subtle ambient background gradients ── */}
       {theme !== 'oled' && (
         <div className="fixed inset-0 pointer-events-none" style={{ zIndex: 0 }}>
+          {/* Neon blue glow - top left */}
           <div
-            className="absolute inset-0"
+            className="absolute inset-0 animate-[glow-pulse_8s_ease-in-out_infinite]"
             style={{
-              background: theme === 'obsidian'
-                ? `radial-gradient(ellipse 80% 60% at 15% 5%, hsl(210 90% 45% / 0.12) 0%, transparent 50%),
-                   radial-gradient(ellipse 70% 50% at 85% 90%, hsl(40 80% 50% / 0.10) 0%, transparent 50%),
-                   #000`
-                : `radial-gradient(ellipse 80% 55% at 10% 5%, hsl(210 100% 50% / 0.14) 0%, transparent 50%),
-                   radial-gradient(ellipse 60% 45% at 90% 10%, hsl(200 85% 55% / 0.08) 0%, transparent 45%),
-                   radial-gradient(ellipse 70% 50% at 85% 85%, hsl(40 85% 50% / 0.12) 0%, transparent 50%),
-                   radial-gradient(ellipse 50% 40% at 20% 80%, hsl(35 75% 45% / 0.07) 0%, transparent 45%),
-                   #000`,
+              background: `radial-gradient(ellipse 80% 55% at 8% 3%, hsl(210 100% 50% / 0.18) 0%, transparent 55%),
+                           radial-gradient(ellipse 50% 40% at 70% 8%, hsl(200 90% 55% / 0.10) 0%, transparent 45%)`,
             }}
           />
+          {/* Golden glow - bottom right */}
+          <div
+            className="absolute inset-0 animate-[glow-pulse_10s_ease-in-out_2s_infinite]"
+            style={{
+              background: `radial-gradient(ellipse 75% 55% at 90% 85%, hsl(42 90% 52% / 0.18) 0%, transparent 55%),
+                           radial-gradient(ellipse 55% 40% at 25% 90%, hsl(38 80% 48% / 0.10) 0%, transparent 45%)`,
+            }}
+          />
+          {/* Base black */}
+          <div className="absolute inset-0 -z-10 bg-black" />
         </div>
       )}
 

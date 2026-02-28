@@ -32,22 +32,23 @@ function rgbToHsl(r: number, g: number, b: number): [number, number, number] {
   return [Math.round(h * 360), Math.round(s * 100), Math.round(l * 100)];
 }
 
-/** Clamp lightness: produce bold Spotify-style tones */
+/** Clamp lightness: keep colors vivid and bright (closer to artwork) */
 function adjustColor(r: number, g: number, b: number): [number, number, number] {
   const [h, s, l] = rgbToHsl(r, g, b);
-  // Target lightness: 30-50 range — rich and visible, not muddy
+
+  // Bright target range so gradients feel colorful, not muddy
   let adjL = l;
-  if (l > 90) adjL = 75 + (l - 90) * 0.3;
-  else if (l < 30) adjL = 30 + l * 0.8; // lift darks aggressively
-  else adjL = Math.max(55, Math.min(80, l)); // bright range 55-80
+  if (l > 92) adjL = 86 + (l - 92) * 0.2;
+  else if (l < 35) adjL = 52 + l * 0.6; // lift dark artwork strongly
+  else adjL = Math.max(62, Math.min(88, l));
 
-  // Boost saturation more aggressively for vivid colors
+  // Strong but tasteful saturation
   let adjS = s;
-  if (s < 30) adjS = s + 25; // boost dull significantly
-  else if (s > 95) adjS = 70 + (s - 95) * 0.3; // tame neon
-  else adjS = Math.max(s, 95); // ensure high vibrancy
+  if (s < 40) adjS = s + 30;
+  else if (s > 97) adjS = 88 + (s - 97) * 0.2;
+  else adjS = Math.max(s, 90);
 
-  return hslToRgb(h, Math.min(adjS, 75), adjL);
+  return hslToRgb(h, Math.min(adjS, 95), Math.min(adjL, 90));
 }
 
 function hslToRgb(h: number, s: number, l: number): [number, number, number] {

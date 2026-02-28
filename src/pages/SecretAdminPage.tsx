@@ -31,19 +31,28 @@ const SecretAdminPage = () => {
   const [authenticated, setAuthenticated] = useState(false);
   const [loading, setLoading] = useState(false);
   const [stats, setStats] = useState<AdminStats | null>(null);
-  const [credentials, setCredentials] = useState({ u: '', p: '' });
 
   const handleLogin = async () => {
     if (!username || !password) { toast.error('Enter credentials'); return; }
     setLoading(true);
     try {
+      // Verify credentials once
+      const { data: loginData, error: loginErr } = await supabase.functions.invoke('admin-auth', {
+        body: { username, password, action: 'login' },
+      });
+      if (loginErr) throw loginErr;
+      if (loginData?.error) { toast.error(loginData.error); setLoading(false); return; }
+
+      // Clear credentials from state immediately
+      setUsername('');
+      setPassword('');
+
+      // Fetch stats using JWT only
       const { data, error } = await supabase.functions.invoke('admin-auth', {
-        body: { username, password },
+        body: {},
       });
       if (error) throw error;
-      if (data?.error) { toast.error(data.error); setLoading(false); return; }
       setStats(data);
-      setCredentials({ u: username, p: password });
       setAuthenticated(true);
       toast.success('Admin access granted');
     } catch (e: any) {
@@ -56,7 +65,7 @@ const SecretAdminPage = () => {
     setLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke('admin-auth', {
-        body: { username: credentials.u, password: credentials.p },
+        body: {},
       });
       if (error) throw error;
       setStats(data);
@@ -70,7 +79,6 @@ const SecretAdminPage = () => {
     setStats(null);
     setUsername('');
     setPassword('');
-    setCredentials({ u: '', p: '' });
   };
 
   // Build chart data from dailyPlays
@@ -201,15 +209,7 @@ const SecretAdminPage = () => {
                       <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                       <XAxis dataKey="date" tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10 }} />
                       <YAxis tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10 }} />
-                      <Tooltip
-                        contentStyle={{
-                          background: 'hsl(var(--card))',
-                          border: '1px solid hsl(var(--border))',
-                          borderRadius: '8px',
-                          color: 'hsl(var(--foreground))',
-                          fontSize: '12px',
-                        }}
-                      />
+                      <Tooltip contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px', color: 'hsl(var(--foreground))', fontSize: '12px' }} />
                       <Bar dataKey="plays" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>

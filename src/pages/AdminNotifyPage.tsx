@@ -21,7 +21,6 @@ const AdminNotifyPage = () => {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [authenticated, setAuthenticated] = useState(false);
-  const [credentials, setCredentials] = useState({ u: '', p: '' });
   const [loading, setLoading] = useState(false);
 
   const [title, setTitle] = useState('');
@@ -34,13 +33,23 @@ const AdminNotifyPage = () => {
     if (!username || !password) { toast.error('Enter credentials'); return; }
     setLoading(true);
     try {
+      // Verify credentials once
+      const { data: loginData, error: loginErr } = await supabase.functions.invoke('admin-auth', {
+        body: { username, password, action: 'login' },
+      });
+      if (loginErr) throw loginErr;
+      if (loginData?.error) { toast.error(loginData.error); setLoading(false); return; }
+
+      // Clear credentials from state immediately
+      setUsername('');
+      setPassword('');
+
+      // Fetch notifications using JWT only
       const { data, error } = await supabase.functions.invoke('admin-auth', {
-        body: { username, password, action: 'list_notifications' },
+        body: { action: 'list_notifications' },
       });
       if (error) throw error;
-      if (data?.error) { toast.error(data.error); setLoading(false); return; }
       setNotifications(data.notifications || []);
-      setCredentials({ u: username, p: password });
       setAuthenticated(true);
       toast.success('Admin access granted');
     } catch (e: any) {
@@ -55,8 +64,6 @@ const AdminNotifyPage = () => {
     try {
       const { data, error } = await supabase.functions.invoke('admin-auth', {
         body: {
-          username: credentials.u,
-          password: credentials.p,
           action: 'send_notification',
           notificationTitle: title,
           notificationBody: body,
@@ -79,7 +86,7 @@ const AdminNotifyPage = () => {
   const deleteNotification = async (id: string) => {
     try {
       await supabase.functions.invoke('admin-auth', {
-        body: { username: credentials.u, password: credentials.p, action: 'delete_notification', notificationId: id },
+        body: { action: 'delete_notification', notificationId: id },
       });
       setNotifications(prev => prev.filter(n => n.id !== id));
       toast.success('Notification deleted');
@@ -127,7 +134,6 @@ const AdminNotifyPage = () => {
     <div className="min-h-screen gradient-bg relative">
       <div className="absolute inset-0 gradient-radial pointer-events-none" />
       <div className="relative z-10 p-6 md:p-8 max-w-2xl mx-auto space-y-6">
-        {/* Header */}
         <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
@@ -138,12 +144,11 @@ const AdminNotifyPage = () => {
               <p className="text-xs text-muted-foreground">Broadcast to all users</p>
             </div>
           </div>
-          <Button onClick={() => { setAuthenticated(false); setCredentials({ u: '', p: '' }); }} variant="outline" size="sm" className="rounded-xl border-destructive/30 text-destructive hover:bg-destructive/10">
+          <Button onClick={() => setAuthenticated(false)} variant="outline" size="sm" className="rounded-xl border-destructive/30 text-destructive hover:bg-destructive/10">
             <LogOut className="h-4 w-4" />
           </Button>
         </motion.div>
 
-        {/* Compose */}
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
           <Card className="glass border-border/20">
             <CardHeader className="pb-3">
@@ -177,7 +182,6 @@ const AdminNotifyPage = () => {
           </Card>
         </motion.div>
 
-        {/* Past Notifications */}
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
           <Card className="glass border-border/20">
             <CardHeader className="pb-3">

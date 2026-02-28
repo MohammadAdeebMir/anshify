@@ -383,8 +383,9 @@ export const PlayerBar = () => {
   const bgGradient = `
     linear-gradient(180deg,
       rgb(${cr},${cg},${cb}) 0%,
-      rgb(${cr},${cg},${cb}) 95%,
-      rgb(${Math.round(cr*0.7)},${Math.round(cg*0.7)},${Math.round(cb*0.7)}) 100%
+      rgb(${Math.round(cr*0.55)},${Math.round(cg*0.55)},${Math.round(cb*0.55)}) 35%,
+      rgb(18,18,20) 65%,
+      rgb(10,10,12) 100%
     )
   `;
 

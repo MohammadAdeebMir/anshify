@@ -32,22 +32,11 @@ function rgbToHsl(r: number, g: number, b: number): [number, number, number] {
   return [Math.round(h * 360), Math.round(s * 100), Math.round(l * 100)];
 }
 
-/** Clamp lightness: keep colors vivid and bright (closer to artwork) */
+/** Snap to pure absolute colors — true red, blue, green etc. */
 function adjustColor(r: number, g: number, b: number): [number, number, number] {
-  const [h, s, l] = rgbToHsl(r, g, b);
-
-  // Bright target range so gradients feel colorful, not muddy
-  let adjL = l;
-  if (l > 95) adjL = 92 + (l - 95) * 0.2;
-  else if (l < 40) adjL = 58 + l * 0.7; // lift darks hard
-  else adjL = Math.max(70, Math.min(95, l)); // bright range 70-95
-
-  // Max saturation — deep & vivid
-  let adjS = s;
-  if (s < 50) adjS = s + 50;
-  else adjS = Math.max(s, 100);
-
-  return hslToRgb(h, Math.min(adjS, 100), Math.min(adjL, 95));
+  const [h] = rgbToHsl(r, g, b);
+  // Pure hue, full saturation, perfect brightness — no muted shades
+  return hslToRgb(h, 100, 50);
 }
 
 function hslToRgb(h: number, s: number, l: number): [number, number, number] {

@@ -1,101 +1,187 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, memo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, ArrowUpDown, Filter, X, Music2, WifiOff } from 'lucide-react';
-import { Input } from '@/components/ui/input';
+import { Search, X, Camera, Clock, Trash2, Play, Pause, Heart, Download, Music2 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { searchYTMusic, getTracksByGenreYT } from '@/services/ytmusic';
 import { usePlayer } from '@/contexts/PlayerContext';
-import { useOfflineTracks } from '@/hooks/useOffline';
+import { useOfflineTracks, useIsOnline } from '@/hooks/useOffline';
 import { Track } from '@/types/music';
 import { YTSearchResults } from '@/components/search/YTSearchResults';
-import { SongListSkeleton } from '@/components/skeletons/Skeletons';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/hooks/useAuth';
-import { useLikedSongs, useLikeTrack } from '@/hooks/useLibrary';
-import { AddToPlaylistButton } from '@/components/AddToPlaylistButton';
-import { Heart, Download, Play, Pause } from 'lucide-react';
-import { useIsOnline } from '@/hooks/useOffline';
+import { useTheme } from '@/contexts/ThemeContext';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 
-const genres = [
-  { name: 'Pop', color: 'from-pink-500 to-rose-600' },
-  { name: 'Rock', color: 'from-red-600 to-orange-500' },
-  { name: 'Electronic', color: 'from-blue-500 to-cyan-400' },
-  { name: 'Hip Hop', color: 'from-yellow-500 to-amber-600' },
-  { name: 'Jazz', color: 'from-indigo-500 to-purple-600' },
-  { name: 'Classical', color: 'from-emerald-500 to-teal-600' },
-  { name: 'R&B', color: 'from-violet-500 to-fuchsia-500' },
-  { name: 'Country', color: 'from-orange-500 to-yellow-500' },
-  { name: 'Metal', color: 'from-gray-700 to-gray-900' },
-  { name: 'Reggae', color: 'from-green-500 to-lime-500' },
-  { name: 'Latin', color: 'from-red-500 to-pink-500' },
-  { name: 'Ambient', color: 'from-sky-400 to-indigo-500' },
+/* ─── Constants ─────────────────────────────────────────────────── */
+
+const FEATURED_TILES = [
+  { name: 'Music', gradient: 'from-[#E13300] to-[#E13300]/80', emoji: '🎵' },
+  { name: 'Podcasts', gradient: 'from-[#006450] to-[#006450]/80', emoji: '🎙️' },
+  { name: 'Live Events', gradient: 'from-[#8400E7] to-[#8400E7]/80', emoji: '🎤' },
+  { name: 'Made For You', gradient: 'from-[#1E3264] to-[#1E3264]/80', emoji: '💜' },
 ];
 
-type SortMode = 'relevance' | 'name' | 'duration';
+const DISCOVER_CARDS = [
+  { title: 'Music for you', query: 'top hits 2025 trending', img: '🎧' },
+  { title: 'Lofi Beats', query: 'lofi hip hop chill beats', img: '🌙' },
+  { title: 'Indie Picks', query: 'best indie songs 2025', img: '🎸' },
+  { title: 'Workout Hits', query: 'workout gym motivation songs', img: '💪' },
+  { title: 'Feel Good', query: 'feel good happy songs', img: '☀️' },
+  { title: 'Late Night', query: 'late night chill vibes', img: '🌃' },
+];
 
-const GenreTrackRow = ({ track, tracks }: { track: Track; tracks: Track[] }) => {
-  const { play, currentTrack, isPlaying } = usePlayer();
-  const { user } = useAuth();
-  const { likedSongs } = useLikedSongs();
-  const { isLiked, toggleLike } = useLikeTrack();
-  const { isDownloaded, download } = useOfflineTracks();
-  const isActive = currentTrack?.id === track.id;
-  const liked = isLiked(track.id, likedSongs);
-  const downloaded = isDownloaded(track.id);
+const GENRES = [
+  { name: 'Pop', bg: '#E13300' },
+  { name: 'Rock', bg: '#BA5D07' },
+  { name: 'Electronic', bg: '#0D73EC' },
+  { name: 'Hip Hop', bg: '#BC5900' },
+  { name: 'Jazz', bg: '#477D95' },
+  { name: 'Classical', bg: '#1E3264' },
+  { name: 'R&B', bg: '#8C67AB' },
+  { name: 'Country', bg: '#A56752' },
+  { name: 'Metal', bg: '#503750' },
+  { name: 'Reggae', bg: '#148A08' },
+  { name: 'Latin', bg: '#E1118C' },
+  { name: 'Ambient', bg: '#537AA5' },
+  { name: 'Bollywood', bg: '#DC148C' },
+  { name: 'K-Pop', bg: '#E61E32' },
+];
 
-  return (
-    <div className={cn('flex items-center gap-3 p-3 rounded-2xl transition-all hover:bg-muted/50', isActive && 'bg-primary/10 ring-1 ring-primary/20')}>
-      <button onClick={() => play(track, tracks)} className="flex items-center gap-3 flex-1 min-w-0 text-left group">
-        <div className="relative h-12 w-12 rounded-xl overflow-hidden flex-shrink-0 shadow-lg">
-          {track.album_image ? (
-            <img src={track.album_image} alt={track.album_name} className="h-full w-full object-cover" loading="lazy" />
-          ) : (
-            <div className="h-full w-full bg-muted flex items-center justify-center"><Play className="h-4 w-4 text-muted-foreground" /></div>
-          )}
-          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center">
-            <div className="opacity-0 group-hover:opacity-100 transition-opacity">
-              {isActive && isPlaying ? <Pause className="h-5 w-5 text-white" /> : <Play className="h-5 w-5 text-white ml-0.5" />}
-            </div>
-          </div>
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className={cn('text-sm font-semibold truncate', isActive ? 'text-primary' : 'text-foreground')}>{track.name}</p>
-          <p className="text-xs text-muted-foreground truncate">{track.artist_name}</p>
-        </div>
-      </button>
-      {user && (
-        <>
-          <button onClick={() => toggleLike.mutate({ track, liked })} className={cn('p-2 rounded-full transition-colors', liked ? 'text-primary' : 'text-muted-foreground hover:text-foreground')}>
-            <Heart className={cn('h-4 w-4', liked && 'fill-current')} />
-          </button>
-          <AddToPlaylistButton track={track} />
-          {!downloaded && (
-            <button onClick={() => download.mutate(track)} className="p-2 text-muted-foreground hover:text-foreground transition-colors">
-              <Download className="h-3.5 w-3.5" />
-            </button>
-          )}
-        </>
-      )}
-      {track.duration > 0 && (
-        <span className="text-xs text-muted-foreground tabular-nums">
-          {Math.floor(track.duration / 60)}:{String(track.duration % 60).padStart(2, '0')}
-        </span>
-      )}
+/* ─── Recent searches helper ───────────────────────────────────── */
+const RECENTS_KEY = 'search-recents';
+const MAX_RECENTS = 12;
+
+function getRecents(): string[] {
+  try {
+    return JSON.parse(localStorage.getItem(RECENTS_KEY) || '[]');
+  } catch { return []; }
+}
+
+function addRecent(q: string) {
+  const list = getRecents().filter(r => r !== q);
+  list.unshift(q);
+  localStorage.setItem(RECENTS_KEY, JSON.stringify(list.slice(0, MAX_RECENTS)));
+}
+
+function clearRecents() {
+  localStorage.removeItem(RECENTS_KEY);
+}
+
+/* ─── Animated Section ─────────────────────────────────────────── */
+const Section = memo(({ title, children, delay = 0, right }: {
+  title: string; children: React.ReactNode; delay?: number; right?: React.ReactNode;
+}) => (
+  <motion.section
+    initial={{ opacity: 0, y: 14 }}
+    animate={{ opacity: 1, y: 0 }}
+    transition={{ duration: 0.35, delay, type: 'spring', stiffness: 150, damping: 24 }}
+    className="space-y-3"
+  >
+    <div className="flex items-center justify-between">
+      <h2 className="text-[17px] sm:text-lg font-bold text-foreground tracking-tight">{title}</h2>
+      {right}
     </div>
-  );
-};
+    {children}
+  </motion.section>
+));
+Section.displayName = 'SearchSection';
 
+/* ─── Featured Tile ────────────────────────────────────────────── */
+const FeaturedTile = memo(({ tile, onClick }: { tile: typeof FEATURED_TILES[0]; onClick: () => void }) => (
+  <motion.button
+    whileTap={{ scale: 0.97 }}
+    onClick={onClick}
+    className={cn(
+      'relative overflow-hidden rounded-xl h-[88px] bg-gradient-to-br text-left transition-shadow',
+      'shadow-lg hover:shadow-xl',
+      tile.gradient,
+    )}
+  >
+    <span className="absolute left-3.5 top-3 text-[15px] font-bold text-white drop-shadow-md">{tile.name}</span>
+    <span className="absolute right-2 bottom-1.5 text-3xl opacity-60 rotate-[-15deg]">{tile.emoji}</span>
+  </motion.button>
+));
+FeaturedTile.displayName = 'FeaturedTile';
+
+/* ─── Discover Card ────────────────────────────────────────────── */
+const DiscoverCard = memo(({ card, onClick }: { card: typeof DISCOVER_CARDS[0]; onClick: () => void }) => (
+  <motion.button
+    whileTap={{ scale: 0.97 }}
+    onClick={onClick}
+    className="flex-shrink-0 w-[150px] sm:w-[170px] group"
+  >
+    <div className="relative h-[150px] sm:h-[170px] rounded-xl overflow-hidden bg-secondary/60 shadow-lg group-hover:shadow-xl transition-shadow">
+      <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/70" />
+      <div className="absolute inset-0 flex items-center justify-center text-5xl opacity-40">{card.img}</div>
+      <span className="absolute bottom-2.5 left-3 right-3 text-[13px] font-bold text-white leading-tight drop-shadow-md">
+        {card.title}
+      </span>
+    </div>
+  </motion.button>
+));
+DiscoverCard.displayName = 'DiscoverCard';
+
+/* ─── Genre Card ───────────────────────────────────────────────── */
+const GenreCard = memo(({ genre, active, onClick }: {
+  genre: typeof GENRES[0]; active: boolean; onClick: () => void;
+}) => (
+  <motion.button
+    whileTap={{ scale: 0.97 }}
+    onClick={onClick}
+    className={cn(
+      'relative overflow-hidden rounded-xl h-[92px] text-left transition-all duration-200',
+      'shadow-md hover:shadow-lg',
+      active && 'ring-2 ring-white/40',
+    )}
+    style={{ background: genre.bg }}
+  >
+    <span className="absolute left-3.5 bottom-3 text-[15px] font-bold text-white drop-shadow-md">{genre.name}</span>
+  </motion.button>
+));
+GenreCard.displayName = 'GenreCard';
+
+/* ─── Background matching Home ─────────────────────────────────── */
+const SearchBackground = memo(({ theme }: { theme: string }) => {
+  if (theme === 'oled') return <div className="fixed inset-0 bg-black -z-10" />;
+  if (theme === 'obsidian') return (
+    <div className="fixed inset-0 -z-10" style={{
+      background: 'radial-gradient(ellipse 70% 50% at 50% 30%, rgba(100,120,160,0.04), transparent 60%), #0b0b0f',
+    }} />
+  );
+  return (
+    <div className="fixed inset-0 -z-10" style={{
+      background: `
+        radial-gradient(ellipse 60% 45% at 30% 20%, rgba(180,140,80,0.045), transparent 55%),
+        radial-gradient(ellipse 50% 40% at 70% 60%, rgba(160,120,60,0.03), transparent 50%),
+        linear-gradient(180deg, #0e0e11 0%, #121216 100%)
+      `,
+    }} />
+  );
+});
+SearchBackground.displayName = 'SearchBackground';
+
+/* ─── Main SearchPage ──────────────────────────────────────────── */
 const SearchPage = () => {
   const [query, setQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [selectedGenre, setSelectedGenre] = useState<string | null>(null);
-  const [sortMode, setSortMode] = useState<SortMode>('relevance');
-  const [showDownloaded, setShowDownloaded] = useState(false);
+  const [recents, setRecents] = useState<string[]>(getRecents());
+  const [isFocused, setIsFocused] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
   const { downloadedTracks } = useOfflineTracks();
   const isOnline = useIsOnline();
+  const { user } = useAuth();
+  const { theme } = useTheme();
+  const { play } = usePlayer();
 
   useEffect(() => {
-    const timer = setTimeout(() => setDebouncedQuery(query), 300);
+    const timer = setTimeout(() => {
+      setDebouncedQuery(query);
+      if (query.length >= 2) {
+        addRecent(query);
+        setRecents(getRecents());
+      }
+    }, 300);
     return () => clearTimeout(timer);
   }, [query]);
 
@@ -116,140 +202,211 @@ const SearchPage = () => {
 
   const showResults = debouncedQuery.length >= 2;
   const showGenreResults = selectedGenre && !showResults;
+  const showDiscovery = !showResults && !showGenreResults;
 
-  const sortTracks = (tracks: Track[]): Track[] => {
-    if (sortMode === 'name') return [...tracks].sort((a, b) => a.name.localeCompare(b.name));
-    if (sortMode === 'duration') return [...tracks].sort((a, b) => b.duration - a.duration);
-    return tracks;
-  };
+  const handleDiscoverClick = useCallback((searchQuery: string) => {
+    setQuery(searchQuery);
+    setSelectedGenre(null);
+  }, []);
 
-  const filterTracks = (tracks: Track[]): Track[] => {
-    if (!showDownloaded) return tracks;
-    const downloadedIds = new Set(downloadedTracks.map(t => t.id));
-    return tracks.filter(t => downloadedIds.has(t.id));
-  };
+  const handleGenreClick = useCallback((name: string) => {
+    setSelectedGenre(name);
+    setQuery('');
+  }, []);
 
-  const displayTracks = (tracks: Track[]) => filterTracks(sortTracks(tracks));
+  const handleRecentClick = useCallback((q: string) => {
+    setQuery(q);
+    setSelectedGenre(null);
+  }, []);
+
+  const handleClearRecents = useCallback(() => {
+    clearRecents();
+    setRecents([]);
+  }, []);
+
+  const handleFeaturedClick = useCallback((name: string) => {
+    setQuery(name.toLowerCase());
+    setSelectedGenre(null);
+  }, []);
+
+  const userInitial = user?.email?.[0]?.toUpperCase() || '?';
 
   return (
-    <div className="p-6 md:p-8 space-y-8 max-w-7xl mx-auto">
-      {/* Offline indicator */}
-      {!isOnline && (
-        <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="flex items-center gap-2 px-4 py-3 rounded-2xl bg-destructive/10 border border-destructive/20">
-          <WifiOff className="h-4 w-4 text-destructive" />
-          <p className="text-sm text-destructive">You're offline. Showing downloaded content only.</p>
-        </motion.div>
-      )}
+    <>
+      <SearchBackground theme={theme} />
 
-      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
-        <div className="flex items-center gap-3">
-          <Music2 className="h-7 w-7 text-primary" />
-          <h1 className="text-3xl font-extrabold text-foreground">Search</h1>
-        </div>
-
-        <div className="flex gap-2">
-          <div className="relative flex-1 max-w-xl">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              value={query}
-              onChange={e => { setQuery(e.target.value); setSelectedGenre(null); }}
-              placeholder="Search millions of songs..."
-              className="pl-11 pr-10 h-12 rounded-2xl bg-muted/60 border-border/20 text-foreground placeholder:text-muted-foreground focus:ring-2 focus:ring-primary/30 transition-all"
-            />
-            {query && (
-              <button onClick={() => { setQuery(''); setDebouncedQuery(''); }} className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-muted transition-colors">
-                <X className="h-4 w-4 text-muted-foreground" />
+      <div className="relative min-h-screen pb-32">
+        {/* Sticky Header */}
+        <div className="sticky top-0 z-20 pt-3 pb-2 px-4 sm:px-6"
+          style={{
+            background: 'linear-gradient(180deg, hsl(var(--background)) 70%, transparent 100%)',
+          }}
+        >
+          <div className="max-w-5xl mx-auto space-y-3">
+            {/* Top row */}
+            <div className="flex items-center justify-between">
+              <Avatar className="h-8 w-8 bg-secondary border border-border/30">
+                <AvatarFallback className="text-xs font-bold text-foreground bg-secondary">
+                  {userInitial}
+                </AvatarFallback>
+              </Avatar>
+              <h1 className="text-2xl font-extrabold text-foreground tracking-tight">Search</h1>
+              <button className="p-2 rounded-full text-muted-foreground hover:text-foreground transition-colors opacity-50">
+                <Camera className="h-5 w-5" />
               </button>
-            )}
-          </div>
-          <div className="flex gap-1">
-            <button
-              onClick={() => setSortMode(s => s === 'relevance' ? 'name' : s === 'name' ? 'duration' : 'relevance')}
-              className="p-3 rounded-2xl bg-muted/60 text-muted-foreground hover:text-foreground transition-colors"
-              title={`Sort: ${sortMode}`}
-            >
-              <ArrowUpDown className="h-4 w-4" />
-            </button>
-            {downloadedTracks.length > 0 && (
-              <button
-                onClick={() => setShowDownloaded(!showDownloaded)}
-                className={cn('p-3 rounded-2xl transition-colors', showDownloaded ? 'bg-primary text-primary-foreground' : 'bg-muted/60 text-muted-foreground hover:text-foreground')}
-                title="Downloaded only"
-              >
-                <Filter className="h-4 w-4" />
-              </button>
-            )}
-          </div>
-        </div>
-
-        {sortMode !== 'relevance' && (
-          <p className="text-xs text-muted-foreground">Sorted by: {sortMode}</p>
-        )}
-      </motion.div>
-
-      {showResults && (
-        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}>
-          <h2 className="text-lg font-bold mb-3 text-foreground">Results</h2>
-          <YTSearchResults
-            tracks={ytResults ? displayTracks(ytResults) : undefined}
-            isLoading={ytLoading}
-            error={ytError as Error | null}
-            onRetry={() => retrySearch()}
-            query={debouncedQuery}
-          />
-        </motion.div>
-      )}
-
-      {showGenreResults && (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-          <div className="flex items-center gap-3 mb-4">
-            <h2 className="text-xl font-bold text-foreground">{selectedGenre}</h2>
-            <button onClick={() => setSelectedGenre(null)} className="text-xs text-muted-foreground hover:text-foreground px-2 py-1 rounded-lg hover:bg-muted/50 transition-colors">✕ Clear</button>
-          </div>
-          {loadingGenre ? (
-            <div className="glass rounded-2xl overflow-hidden"><SongListSkeleton count={5} /></div>
-          ) : genreTracks && genreTracks.length > 0 ? (
-            <div className="glass rounded-2xl overflow-hidden">
-              {displayTracks(genreTracks).map(t => <GenreTrackRow key={t.id} track={t} tracks={genreTracks} />)}
             </div>
-          ) : (
-            <div className="glass rounded-2xl p-8 text-center">
-              <p className="text-sm text-muted-foreground">No tracks found for this genre</p>
-            </div>
-          )}
-        </motion.div>
-      )}
 
-      {showDownloaded && downloadedTracks.length > 0 && !showResults && !showGenreResults && (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-          <h2 className="text-xl font-bold mb-4 text-foreground">Downloaded ({downloadedTracks.length})</h2>
-          <div className="glass rounded-2xl overflow-hidden">
-            {downloadedTracks.map(t => <GenreTrackRow key={t.id} track={t} tracks={downloadedTracks} />)}
-          </div>
-        </motion.div>
-      )}
-
-      {!showResults && (
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.1 }}>
-          <h2 className="text-xl font-bold mb-4 text-foreground">Browse All</h2>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-            {genres.map(genre => (
-              <button
-                key={genre.name}
-                onClick={() => { setSelectedGenre(genre.name); setQuery(''); }}
+            {/* Search bar */}
+            <div className={cn(
+              'relative transition-all duration-200',
+              isFocused && 'scale-[1.01]',
+            )}>
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-[18px] w-[18px] text-muted-foreground" />
+              <input
+                ref={inputRef}
+                value={query}
+                onChange={e => { setQuery(e.target.value); setSelectedGenre(null); }}
+                onFocus={() => setIsFocused(true)}
+                onBlur={() => setIsFocused(false)}
+                placeholder="What do you want to listen to?"
                 className={cn(
-                  'relative overflow-hidden rounded-2xl p-5 h-28 bg-gradient-to-br text-left transition-all duration-200 hover:scale-[1.03] active:scale-[0.98]',
-                  genre.color,
-                  selectedGenre === genre.name ? 'ring-2 ring-white/50 shadow-lg' : 'shadow-md'
+                  'w-full h-12 pl-11 pr-10 rounded-xl text-[15px] font-medium',
+                  'bg-secondary/70 text-foreground placeholder:text-muted-foreground/60',
+                  'border border-border/20 outline-none',
+                  'transition-all duration-200',
+                  isFocused && 'bg-secondary/90 border-border/40 shadow-lg shadow-black/20',
                 )}
-              >
-                <span className="text-lg font-bold text-white drop-shadow-lg">{genre.name}</span>
-              </button>
-            ))}
+              />
+              {query && (
+                <button
+                  onClick={() => { setQuery(''); setDebouncedQuery(''); inputRef.current?.focus(); }}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 rounded-full hover:bg-muted/50 transition-colors"
+                >
+                  <X className="h-4 w-4 text-muted-foreground" />
+                </button>
+              )}
+            </div>
           </div>
-        </motion.div>
-      )}
-    </div>
+        </div>
+
+        {/* Content */}
+        <div className="px-4 sm:px-6 pt-2">
+          <div className="max-w-5xl mx-auto space-y-7">
+
+            {/* Search results */}
+            <AnimatePresence mode="wait">
+              {showResults && (
+                <motion.div key="results" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.25 }}>
+                  <h2 className="text-lg font-bold mb-3 text-foreground">Results</h2>
+                  <YTSearchResults
+                    tracks={ytResults}
+                    isLoading={ytLoading}
+                    error={ytError as Error | null}
+                    onRetry={() => retrySearch()}
+                    query={debouncedQuery}
+                  />
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* Genre results */}
+            <AnimatePresence mode="wait">
+              {showGenreResults && (
+                <motion.div key="genre" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                  <div className="flex items-center gap-3 mb-4">
+                    <h2 className="text-xl font-bold text-foreground">{selectedGenre}</h2>
+                    <button onClick={() => setSelectedGenre(null)} className="text-xs text-muted-foreground hover:text-foreground px-2.5 py-1 rounded-lg bg-secondary/50 transition-colors">
+                      ✕ Clear
+                    </button>
+                  </div>
+                  {loadingGenre ? (
+                    <div className="space-y-2">
+                      {Array.from({ length: 5 }).map((_, i) => (
+                        <div key={i} className="h-16 rounded-xl bg-secondary/30 animate-pulse" />
+                      ))}
+                    </div>
+                  ) : genreTracks && genreTracks.length > 0 ? (
+                    <div className="rounded-2xl overflow-hidden bg-secondary/20 backdrop-blur-sm">
+                      <YTSearchResults tracks={genreTracks} isLoading={false} error={null} onRetry={() => {}} query={selectedGenre!} />
+                    </div>
+                  ) : (
+                    <div className="rounded-2xl p-8 text-center bg-secondary/20">
+                      <p className="text-sm text-muted-foreground">No tracks found for this genre</p>
+                    </div>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* Discovery sections */}
+            {showDiscovery && (
+              <>
+                {/* Recent Searches */}
+                {recents.length > 0 && (
+                  <Section
+                    title="Recent searches"
+                    delay={0}
+                    right={
+                      <button onClick={handleClearRecents} className="flex items-center gap-1 text-[12px] text-muted-foreground hover:text-foreground transition-colors">
+                        <Trash2 className="h-3 w-3" />
+                        Clear
+                      </button>
+                    }
+                  >
+                    <div className="flex flex-wrap gap-2">
+                      {recents.map(r => (
+                        <motion.button
+                          key={r}
+                          whileTap={{ scale: 0.95 }}
+                          onClick={() => handleRecentClick(r)}
+                          className="flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-secondary/60 text-[13px] font-medium text-foreground hover:bg-secondary/90 transition-colors min-h-[36px]"
+                        >
+                          <Clock className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                          <span className="truncate max-w-[140px]">{r}</span>
+                        </motion.button>
+                      ))}
+                    </div>
+                  </Section>
+                )}
+
+                {/* Start browsing */}
+                <Section title="Start browsing" delay={0.05}>
+                  <div className="grid grid-cols-2 gap-3">
+                    {FEATURED_TILES.map(tile => (
+                      <FeaturedTile key={tile.name} tile={tile} onClick={() => handleFeaturedClick(tile.name)} />
+                    ))}
+                  </div>
+                </Section>
+
+                {/* Discover something new */}
+                <Section title="Discover something new" delay={0.1}>
+                  <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide snap-x snap-mandatory" style={{ scrollbarWidth: 'none' }}>
+                    {DISCOVER_CARDS.map(card => (
+                      <DiscoverCard key={card.title} card={card} onClick={() => handleDiscoverClick(card.query)} />
+                    ))}
+                  </div>
+                </Section>
+
+                {/* Browse all */}
+                <Section title="Browse all" delay={0.15}>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                    {GENRES.map(genre => (
+                      <GenreCard
+                        key={genre.name}
+                        genre={genre}
+                        active={selectedGenre === genre.name}
+                        onClick={() => handleGenreClick(genre.name)}
+                      />
+                    ))}
+                  </div>
+                </Section>
+              </>
+            )}
+
+          </div>
+        </div>
+      </div>
+    </>
   );
 };
 

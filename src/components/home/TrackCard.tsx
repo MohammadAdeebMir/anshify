@@ -4,6 +4,7 @@ import { Track } from '@/types/music';
 import { usePlayer } from '@/contexts/PlayerContext';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
+import { useHDArtwork } from '@/hooks/useHDArtwork';
 
 interface TrackCardProps {
   track: Track;
@@ -15,6 +16,7 @@ export const TrackCard = ({ track, tracks, index = 0 }: TrackCardProps) => {
   const { play, pause, currentTrack, isPlaying } = usePlayer();
   const isActive = currentTrack?.id === track.id;
   const [imgLoaded, setImgLoaded] = useState(false);
+  const hdArtwork = useHDArtwork(track.id, track.album_image);
 
   const handleClick = () => {
     if (isActive && isPlaying) {
@@ -29,17 +31,17 @@ export const TrackCard = ({ track, tracks, index = 0 }: TrackCardProps) => {
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3, delay: index * 0.03, type: 'spring', stiffness: 200 }}
-      whileTap={{ scale: 0.97 }}
+      whileTap={{ scale: 0.96 }}
       onClick={handleClick}
       className="group snap-start flex-shrink-0 w-[165px] sm:w-[185px] text-left"
     >
-      <div className="relative aspect-square overflow-hidden mb-2.5 shadow-lg shadow-black/30" style={{ borderRadius: '3px' }}>
+      <div className="relative aspect-square overflow-hidden mb-2.5 rounded-xl shadow-lg shadow-black/40">
         {!imgLoaded && (
-          <div className="absolute inset-0 bg-secondary animate-pulse" />
+          <div className="absolute inset-0 bg-secondary animate-pulse rounded-xl" />
         )}
-        {track.album_image ? (
+        {hdArtwork ? (
           <img
-            src={track.album_image}
+            src={hdArtwork}
             alt={track.name}
             onLoad={() => setImgLoaded(true)}
             className={cn(

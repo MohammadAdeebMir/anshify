@@ -77,6 +77,8 @@ import { useLikedSongs, useLikeTrack } from '@/hooks/useLibrary';
 import { SleepTimerPopover } from '@/components/SleepTimerPopover';
 import { QueuePanel } from '@/components/QueuePanel';
 import { useDominantColor } from '@/hooks/useDominantColor';
+import { useHDArtwork } from '@/hooks/useHDArtwork';
+import { preloadArtwork } from '@/utils/artworkUtils';
 
 const formatTime = (s: number) => {
   if (!s || !isFinite(s) || isNaN(s) || s < 0) return '0:00';
@@ -334,14 +336,14 @@ export const PlayerBar = () => {
   const [miniDragY, setMiniDragY] = useState(0);
   const lastTapRef = useRef(0);
   const dominantColor = useDominantColor(player.currentTrack?.album_image);
+  const hdArtwork = useHDArtwork(player.currentTrack?.id, player.currentTrack?.album_image);
 
   // Preload next track artwork
   useEffect(() => {
     const { queue, queueIndex } = player;
     const nextTrack = queue[queueIndex + 1];
-    if (nextTrack?.album_image) {
-      const img = new Image();
-      img.src = nextTrack.album_image;
+    if (nextTrack) {
+      preloadArtwork(nextTrack.id, nextTrack.album_image);
     }
   }, [player.queueIndex, player.queue]);
 
@@ -488,7 +490,7 @@ export const PlayerBar = () => {
             initial={{ scale: 0.85, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             transition={{ type: 'spring', stiffness: 200, damping: 22, mass: 0.8, delay: 0.1 }}
-            className="flex-1 flex items-center justify-center px-[8%] relative min-h-0 py-4" style={{ zIndex: 2 }}
+            className="flex-1 flex items-center justify-center px-[6%] relative min-h-0 py-3" style={{ zIndex: 2 }}
           >
             <motion.div
               drag="x"
@@ -496,7 +498,7 @@ export const PlayerBar = () => {
               dragElastic={0.12}
               onDragEnd={handleArtworkSwipe}
               onTap={handleDoubleTap}
-              className="w-[82vw] max-w-[480px] aspect-square relative"
+              className="w-[85vw] max-w-[520px] aspect-square relative"
             >
               <AnimatePresence mode="wait">
                 <motion.div
@@ -516,10 +518,10 @@ export const PlayerBar = () => {
                     }}
                   />
                   {/* Artwork card */}
-                  <div className="relative w-full h-full rounded-[14px] overflow-hidden shadow-[0_16px_60px_rgba(0,0,0,0.6)]">
-                    {currentTrack.album_image ? (
+                  <div className="relative w-full h-full rounded-[16px] overflow-hidden shadow-[0_20px_80px_rgba(0,0,0,0.7)]">
+                    {hdArtwork ? (
                       <img
-                        src={currentTrack.album_image}
+                        src={hdArtwork}
                         alt={currentTrack.album_name || 'Album art'}
                         className="h-full w-full object-cover"
                         decoding="async"
@@ -529,12 +531,12 @@ export const PlayerBar = () => {
                         <Music2 className="h-16 w-16 text-white/10" />
                       </div>
                     )}
-                    <div className="absolute inset-0 bg-gradient-to-b from-white/[0.04] via-transparent to-black/[0.12] pointer-events-none" />
+                    <div className="absolute inset-0 bg-gradient-to-b from-white/[0.03] via-transparent to-black/[0.08] pointer-events-none" />
                   </div>
 
                   {/* Buffering overlay */}
                   {isBuffering && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-black/25 rounded-[14px]">
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/25 rounded-[16px]">
                       <Loader2 className="h-10 w-10 text-white/60 animate-spin" />
                     </div>
                   )}
@@ -696,8 +698,9 @@ export const PlayerBar = () => {
         animate={{ y: 0, opacity: 1, scale: 1 }}
         exit={{ y: 120, opacity: 0, scale: 0.95 }}
         transition={{ type: 'spring', damping: 26, stiffness: 240 }}
-        className={cn('fixed z-30', isMobile ? 'bottom-16 left-2 right-2' : 'bottom-2 left-3 right-3')}
+        className={cn('fixed z-40', isMobile ? 'left-2 right-2' : 'bottom-2 left-3 right-3')}
         style={{
+          bottom: isMobile ? 'calc(3.5rem + env(safe-area-inset-bottom, 0px) + 8px)' : undefined,
           opacity: miniDragY > 0 ? Math.max(0.2, 1 - miniDragY / 180) : 1,
           scale: miniDragY > 0 ? Math.max(0.92, 1 - miniDragY / 800) : 1,
         }}
@@ -731,15 +734,15 @@ export const PlayerBar = () => {
         )}
 
         <motion.div
-          className={cn('flex items-center gap-3 px-4 sm:px-5 relative z-10', isMobile ? 'h-[64px]' : 'h-[68px]')}
+          className={cn('flex items-center gap-3 px-4 sm:px-5 relative z-10', isMobile ? 'h-[68px]' : 'h-[68px]')}
         >
           <button onClick={() => isMobile && setExpanded(true)} className="flex items-center gap-3 flex-1 min-w-0 text-left">
             <motion.div
               layoutId="player-artwork"
-              className={cn('rounded-lg overflow-hidden flex-shrink-0 shadow-md', isMobile ? 'h-11 w-11' : 'h-12 w-12')}
+              className={cn('rounded-xl overflow-hidden flex-shrink-0 shadow-lg', isMobile ? 'h-12 w-12' : 'h-12 w-12')}
             >
-              {currentTrack.album_image ? (
-                <img src={currentTrack.album_image} alt={currentTrack.album_name || ''}
+              {hdArtwork ? (
+                <img src={hdArtwork} alt={currentTrack.album_name || ''}
                   className="h-full w-full object-cover" loading="lazy" decoding="async" />
               ) : (
                 <div className="h-full w-full bg-white/5 flex items-center justify-center">

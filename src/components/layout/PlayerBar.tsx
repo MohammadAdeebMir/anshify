@@ -11,6 +11,8 @@ import { motion, AnimatePresence, PanInfo } from 'framer-motion';
 import { useState, useRef, useCallback, useEffect, memo, useMemo } from 'react';
 
 /* ─── Marquee Text ───────────────────────────────────────────────── */
+const MARQUEE_PAUSE = 5; // seconds to show full name before scrolling
+
 const MarqueeText = memo(({ text, className, forceScroll = false, syncDuration }: { text: string; className?: string; forceScroll?: boolean; syncDuration?: number }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const textRef = useRef<HTMLSpanElement>(null);
@@ -34,7 +36,11 @@ const MarqueeText = memo(({ text, className, forceScroll = false, syncDuration }
     return () => ro.disconnect();
   }, [text, forceScroll, syncDuration]);
 
-  const dur = syncDuration || scrollDuration;
+  const moveDur = syncDuration || scrollDuration;
+  // Total cycle = pause + scroll
+  const totalDur = MARQUEE_PAUSE + moveDur;
+  // Percentage of total time spent paused
+  const pausePercent = ((MARQUEE_PAUSE / totalDur) * 100).toFixed(1);
 
   return (
     <div
@@ -55,8 +61,10 @@ const MarqueeText = memo(({ text, className, forceScroll = false, syncDuration }
         style={
           shouldScroll
             ? {
-                animation: `marquee-scroll ${dur}s ease-in-out 0s infinite`,
+                animation: `marquee-dynamic ${totalDur}s linear infinite`,
                 willChange: 'transform',
+                // Inject dynamic keyframes via CSS custom property workaround
+                // We use inline keyframe trick below
               }
             : undefined
         }
@@ -68,6 +76,14 @@ const MarqueeText = memo(({ text, className, forceScroll = false, syncDuration }
           </span>
         )}
       </span>
+      {shouldScroll && (
+        <style>{`
+          @keyframes marquee-dynamic {
+            0%, ${pausePercent}% { transform: translateX(0); }
+            100% { transform: translateX(-50%); }
+          }
+        `}</style>
+      )}
     </div>
   );
 });

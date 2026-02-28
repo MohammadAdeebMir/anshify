@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 
-export type ThemeMode = 'default' | 'amoled' | 'midnight';
+export type ThemeMode = 'default' | 'oled' | 'obsidian';
 
 interface ThemeContextType {
   theme: ThemeMode;

@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useTheme } from '@/contexts/ThemeContext';
 import { TrendingUp, Music2, Sparkles, Clock, Users, Headphones, Zap } from 'lucide-react';
 import { getTrendingYT, getNewReleasesYT, searchYTMusic } from '@/services/ytmusic';
 import { usePlayer } from '@/contexts/PlayerContext';
@@ -141,6 +142,7 @@ function useFallbackSections() {
    HOME PAGE
    ═══════════════════════════════════════════════════════════════════ */
 const Index = () => {
+  const { theme } = useTheme();
   const { user } = useAuth();
   const [filter, setFilter] = useState<Filter>('All');
   const { recentlyPlayed, isLoading: loadingRecent } = useRecentlyPlayed();
@@ -177,16 +179,20 @@ const Index = () => {
   return (
     <div className="max-w-5xl mx-auto pb-36">
       {/* ── Subtle ambient background gradients ── */}
-      <div className="fixed inset-0 pointer-events-none" style={{ zIndex: 0 }}>
-        <div
-          className="absolute inset-0 transition-all duration-[2000ms]"
-          style={{
-            background: isNight
-              ? 'radial-gradient(ellipse at 30% 10%, hsl(var(--purple-glow) / 0.06) 0%, transparent 50%), radial-gradient(ellipse at 70% 90%, hsl(var(--magenta) / 0.04) 0%, transparent 50%)'
-              : 'radial-gradient(ellipse at 20% 15%, hsl(var(--glow-soft) / 0.05) 0%, transparent 50%), radial-gradient(ellipse at 80% 80%, hsl(var(--shimmer) / 0.04) 0%, transparent 45%)',
-          }}
-        />
-      </div>
+      {theme !== 'oled' && (
+        <div className="fixed inset-0 pointer-events-none" style={{ zIndex: 0 }}>
+          <div
+            className="absolute inset-0 transition-all duration-[600ms]"
+            style={{
+              background: theme === 'obsidian'
+                ? 'radial-gradient(ellipse at 40% 15%, hsl(240 8% 45% / 0.04) 0%, transparent 50%)'
+                : isNight
+                  ? 'radial-gradient(ellipse at 30% 10%, hsl(35 30% 45% / 0.05) 0%, transparent 50%), radial-gradient(ellipse at 70% 85%, hsl(25 20% 40% / 0.03) 0%, transparent 50%)'
+                  : 'radial-gradient(ellipse at 25% 15%, hsl(35 35% 50% / 0.045) 0%, transparent 50%), radial-gradient(ellipse at 80% 80%, hsl(30 25% 45% / 0.03) 0%, transparent 45%)',
+            }}
+          />
+        </div>
+      )}
 
       <div className="relative" style={{ zIndex: 1 }}>
         {/* ── Top Bar: Profile + Filter Pills ── */}

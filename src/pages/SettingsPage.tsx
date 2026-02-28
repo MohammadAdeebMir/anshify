@@ -14,9 +14,9 @@ import { useTheme, ThemeMode } from '@/contexts/ThemeContext';
 import { cn } from '@/lib/utils';
 
 const themes: { id: ThemeMode; name: string; desc: string; preview: string }[] = [
-  { id: 'default', name: 'Obsidian', desc: 'Deep black with purple accents', preview: 'bg-gradient-to-br from-[#0a0a0a] to-[#1a0a2a]' },
-  { id: 'amoled', name: 'AMOLED Pure', desc: 'True black for OLED displays', preview: 'bg-black border border-border/30' },
-  { id: 'midnight', name: 'Midnight', desc: 'Deep navy with blue glow', preview: 'bg-gradient-to-br from-[#050a15] to-[#0a1530]' },
+  { id: 'default', name: 'Default', desc: 'Rich dark with subtle golden warmth', preview: 'bg-gradient-to-br from-[#0e0e11] to-[#1a1610]' },
+  { id: 'oled', name: 'Pure OLED', desc: 'True black, battery-friendly', preview: 'bg-black border border-border/30' },
+  { id: 'obsidian', name: 'Obsidian', desc: 'Deep neutral dark, cool tones', preview: 'bg-gradient-to-br from-[#0b0b0f] to-[#101014]' },
 ];
 
 const crossfadeOptions: { label: string; value: CrossfadeMode }[] = [

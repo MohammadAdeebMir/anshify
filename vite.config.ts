@@ -18,7 +18,7 @@ export default defineConfig(({ mode }) => ({
     mode === "development" && componentTagger(),
     VitePWA({
       registerType: "autoUpdate",
-      includeAssets: ["favicon.ico", "pwa-192.png", "pwa-512.png"],
+      includeAssets: ["favicon.ico", "pwa-192.png", "pwa-512.png", "logo.png"],
       manifest: {
         name: "Anshify - Stream Music Free",
         short_name: "Anshify",

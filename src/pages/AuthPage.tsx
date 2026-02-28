@@ -65,10 +65,10 @@ const AuthPage = () => {
       >
         {/* Logo */}
         <div className="flex flex-col items-center gap-3">
-          <div className="h-12 w-12 rounded-2xl bg-primary flex items-center justify-center glow-primary">
-            <Music2 className="h-6 w-6 text-primary-foreground" />
+          <div className="h-12 w-12 rounded-2xl overflow-hidden">
+            <img src="/logo.png" alt="Anshify" className="w-full h-full object-contain" />
           </div>
-          <h1 className="text-2xl font-bold text-foreground">Purple Haze</h1>
+          <h1 className="text-2xl font-bold text-foreground">Anshify</h1>
           <p className="text-muted-foreground text-sm">
             {mode === 'login' && 'Welcome back'}
             {mode === 'signup' && 'Create your account'}

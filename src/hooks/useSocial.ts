@@ -121,7 +121,7 @@ export function useShareUrl() {
       if (navigator.share) {
         navigator.share({
           title: `${track.name} by ${track.artist_name}`,
-          text: `Check out ${track.name} by ${track.artist_name} on Purple Haze!`,
+          text: `Check out ${track.name} by ${track.artist_name} on Anshify!`,
           url: window.location.href,
         }).catch(() => {});
       } else {

@@ -53,6 +53,7 @@ export const ProfilePanel = memo(({ open, onClose }: ProfilePanelProps) => {
             animate={{ x: 0 }}
             exit={{ x: '100%' }}
             transition={{ type: 'spring', damping: 28, stiffness: 300 }}
+            onClick={(e) => e.stopPropagation()}
             className="fixed right-0 top-0 bottom-0 z-50 w-[85%] max-w-[340px] flex flex-col"
             style={{
               background: 'hsl(var(--background))',

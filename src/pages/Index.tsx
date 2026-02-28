@@ -199,10 +199,10 @@ const Index = () => {
               <img
                 src={appLogo}
                 alt="Anshify"
-                className="h-[30px] w-auto object-contain flex-shrink-0 brightness-[1.8] invert"
+                className="h-[38px] w-auto object-contain flex-shrink-0 brightness-[1.8] invert"
                 style={{ imageRendering: 'auto' }}
               />
-              <span className="text-[19px] font-semibold tracking-wide" style={{ color: '#BABABA' }}>
+              <span className="text-[19px] font-semibold tracking-wide ml-1.5" style={{ color: '#BABABA' }}>
                 Anshify
               </span>
             </div>

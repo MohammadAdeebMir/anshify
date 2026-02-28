@@ -79,6 +79,20 @@ export const AIPlaylistGenerator = () => {
     }
   };
 
+  if (!user) {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center gap-2">
+          <Sparkles className="h-5 w-5 text-primary" />
+          <h2 className="text-lg font-bold text-foreground">AI Playlist</h2>
+        </div>
+        <div className="glass rounded-2xl p-6 text-center space-y-2">
+          <p className="text-sm text-muted-foreground">Sign up to generate AI playlists tailored to your vibe.</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2">

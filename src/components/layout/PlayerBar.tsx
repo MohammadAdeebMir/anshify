@@ -704,12 +704,12 @@ export const PlayerBar = () => {
           }
         }}
       >
-        <div className="absolute inset-0"
+        <div className="absolute inset-0 rounded-t-xl overflow-hidden"
           style={{
-            background: `linear-gradient(180deg, rgba(${cr},${cg},${cb},0.2) 0%, rgb(8,8,8) 100%)`,
+            background: `linear-gradient(135deg, rgba(${cr},${cg},${cb},0.85) 0%, rgba(${Math.round(cr*0.6)},${Math.round(cg*0.6)},${Math.round(cb*0.6)},0.9) 100%)`,
             backdropFilter: 'blur(40px)', WebkitBackdropFilter: 'blur(40px)',
-            borderTop: '1px solid rgba(255,255,255,0.06)',
-            transition: 'background 400ms ease',
+            borderTop: '1px solid rgba(255,255,255,0.1)',
+            transition: 'background 500ms ease',
           }}
         />
 

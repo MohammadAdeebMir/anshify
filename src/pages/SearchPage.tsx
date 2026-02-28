@@ -1,10 +1,10 @@
 import { useState, useEffect, useCallback, memo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, X, Camera, Clock, Trash2, Play, Pause, Heart, Download, Music2 } from 'lucide-react';
+import { Search, X, Clock, Trash2, Play, Pause, Flame, Music2 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
-import { searchYTMusic, getTracksByGenreYT } from '@/services/ytmusic';
+import { searchYTMusic, getTracksByGenreYT, getTrendingYT } from '@/services/ytmusic';
 import { usePlayer } from '@/contexts/PlayerContext';
-import { useOfflineTracks, useIsOnline } from '@/hooks/useOffline';
+import { useIsOnline } from '@/hooks/useOffline';
 import { Track } from '@/types/music';
 import { YTSearchResults } from '@/components/search/YTSearchResults';
 import { cn } from '@/lib/utils';
@@ -14,71 +14,96 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 
 /* ─── Constants ─────────────────────────────────────────────────── */
 
-const FEATURED_TILES = [
-  { name: 'Music', gradient: 'from-[#E13300] to-[#E13300]/80', emoji: '🎵' },
-  { name: 'Podcasts', gradient: 'from-[#006450] to-[#006450]/80', emoji: '🎙️' },
-  { name: 'Live Events', gradient: 'from-[#8400E7] to-[#8400E7]/80', emoji: '🎤' },
-  { name: 'Made For You', gradient: 'from-[#1E3264] to-[#1E3264]/80', emoji: '💜' },
-];
-
-const DISCOVER_CARDS = [
-  { title: 'Music for you', query: 'top hits 2025 trending', img: '🎧' },
-  { title: 'Lofi Beats', query: 'lofi hip hop chill beats', img: '🌙' },
-  { title: 'Indie Picks', query: 'best indie songs 2025', img: '🎸' },
-  { title: 'Workout Hits', query: 'workout gym motivation songs', img: '💪' },
-  { title: 'Feel Good', query: 'feel good happy songs', img: '☀️' },
-  { title: 'Late Night', query: 'late night chill vibes', img: '🌃' },
-];
-
-const GENRES = [
-  { name: 'Pop', bg: '#E13300' },
-  { name: 'Rock', bg: '#BA5D07' },
-  { name: 'Electronic', bg: '#0D73EC' },
-  { name: 'Hip Hop', bg: '#BC5900' },
-  { name: 'Jazz', bg: '#477D95' },
-  { name: 'Classical', bg: '#1E3264' },
-  { name: 'R&B', bg: '#8C67AB' },
-  { name: 'Country', bg: '#A56752' },
-  { name: 'Metal', bg: '#503750' },
-  { name: 'Reggae', bg: '#148A08' },
-  { name: 'Latin', bg: '#E1118C' },
-  { name: 'Ambient', bg: '#537AA5' },
-  { name: 'Bollywood', bg: '#DC148C' },
-  { name: 'K-Pop', bg: '#E61E32' },
+const CATEGORIES = [
+  { name: 'Pop', gradient: 'from-rose-500/80 to-pink-600/60' },
+  { name: 'Hip Hop', gradient: 'from-amber-500/80 to-orange-600/60' },
+  { name: 'Rock', gradient: 'from-red-600/80 to-red-800/60' },
+  { name: 'Electronic', gradient: 'from-cyan-500/80 to-blue-600/60' },
+  { name: 'R&B', gradient: 'from-purple-500/80 to-violet-600/60' },
+  { name: 'Jazz', gradient: 'from-teal-500/80 to-emerald-600/60' },
+  { name: 'Classical', gradient: 'from-indigo-500/80 to-blue-700/60' },
+  { name: 'Bollywood', gradient: 'from-fuchsia-500/80 to-pink-600/60' },
+  { name: 'K-Pop', gradient: 'from-rose-400/80 to-red-500/60' },
+  { name: 'Latin', gradient: 'from-yellow-500/80 to-orange-500/60' },
+  { name: 'Country', gradient: 'from-amber-600/80 to-yellow-700/60' },
+  { name: 'Metal', gradient: 'from-slate-500/80 to-zinc-700/60' },
 ];
 
 /* ─── Recent searches helper ───────────────────────────────────── */
 const RECENTS_KEY = 'search-recents';
+const RECENTS_DATA_KEY = 'search-recents-data';
 const MAX_RECENTS = 12;
 
-function getRecents(): string[] {
+interface RecentItem {
+  query: string;
+  track?: { name: string; artist: string; image: string };
+}
+
+function getRecents(): RecentItem[] {
   try {
-    return JSON.parse(localStorage.getItem(RECENTS_KEY) || '[]');
+    const data = localStorage.getItem(RECENTS_DATA_KEY);
+    if (data) return JSON.parse(data);
+    // fallback to old format
+    const old = JSON.parse(localStorage.getItem(RECENTS_KEY) || '[]');
+    return old.map((q: string) => ({ query: q }));
   } catch { return []; }
 }
 
-function addRecent(q: string) {
-  const list = getRecents().filter(r => r !== q);
-  list.unshift(q);
-  localStorage.setItem(RECENTS_KEY, JSON.stringify(list.slice(0, MAX_RECENTS)));
+function addRecent(q: string, track?: Track) {
+  const list = getRecents().filter(r => r.query !== q);
+  list.unshift({
+    query: q,
+    track: track ? { name: track.name, artist: track.artist_name, image: track.album_image } : undefined,
+  });
+  localStorage.setItem(RECENTS_DATA_KEY, JSON.stringify(list.slice(0, MAX_RECENTS)));
 }
 
 function clearRecents() {
   localStorage.removeItem(RECENTS_KEY);
+  localStorage.removeItem(RECENTS_DATA_KEY);
 }
+
+/* ─── Crossfade image ──────────────────────────────────────────── */
+const ImgFade = memo(({ src, alt, className }: { src: string; alt: string; className?: string }) => {
+  const [loaded, setLoaded] = useState(false);
+  return (
+    <div className={cn('relative overflow-hidden bg-muted/30', className)}>
+      {!loaded && <div className="absolute inset-0 shimmer" />}
+      <img
+        src={src}
+        alt={alt}
+        onLoad={() => setLoaded(true)}
+        className={cn('h-full w-full object-cover transition-opacity duration-300', loaded ? 'opacity-100' : 'opacity-0')}
+        loading="lazy"
+        decoding="async"
+      />
+    </div>
+  );
+});
+ImgFade.displayName = 'ImgFade';
+
+/* ─── Horizontal Carousel Shell ────────────────────────────────── */
+const HCarousel = ({ children }: { children: React.ReactNode }) => (
+  <div
+    className="flex gap-3 overflow-x-auto pb-2 snap-x snap-mandatory"
+    style={{ scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' }}
+  >
+    {children}
+  </div>
+);
 
 /* ─── Animated Section ─────────────────────────────────────────── */
 const Section = memo(({ title, children, delay = 0, right }: {
   title: string; children: React.ReactNode; delay?: number; right?: React.ReactNode;
 }) => (
   <motion.section
-    initial={{ opacity: 0, y: 14 }}
+    initial={{ opacity: 0, y: 16 }}
     animate={{ opacity: 1, y: 0 }}
-    transition={{ duration: 0.35, delay, type: 'spring', stiffness: 150, damping: 24 }}
+    transition={{ duration: 0.4, delay, type: 'spring', stiffness: 120, damping: 22 }}
     className="space-y-3"
   >
     <div className="flex items-center justify-between">
-      <h2 className="text-[17px] sm:text-lg font-bold text-foreground tracking-tight">{title}</h2>
+      <h2 className="text-lg font-bold text-foreground tracking-tight">{title}</h2>
       {right}
     </div>
     {children}
@@ -86,61 +111,147 @@ const Section = memo(({ title, children, delay = 0, right }: {
 ));
 Section.displayName = 'SearchSection';
 
-/* ─── Featured Tile ────────────────────────────────────────────── */
-const FeaturedTile = memo(({ tile, onClick }: { tile: typeof FEATURED_TILES[0]; onClick: () => void }) => (
+/* ─── Track Card (horizontal carousel item) ────────────────────── */
+const TrackCard = memo(({ track, tracks, size = 'md' }: { track: Track; tracks: Track[]; size?: 'sm' | 'md' }) => {
+  const { play, currentTrack, isPlaying } = usePlayer();
+  const isActive = currentTrack?.id === track.id;
+  const w = size === 'sm' ? 'w-[130px]' : 'w-[150px] sm:w-[165px]';
+  const imgH = size === 'sm' ? 'h-[130px]' : 'h-[150px] sm:h-[165px]';
+
+  return (
+    <motion.button
+      whileTap={{ scale: 0.96 }}
+      whileHover={{ y: -4 }}
+      transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+      onClick={() => play(track, tracks)}
+      className={cn('flex-shrink-0 snap-start text-left group', w)}
+    >
+      <div className={cn('relative rounded-2xl overflow-hidden shadow-lg shadow-black/30', imgH)}>
+        {track.album_image ? (
+          <ImgFade src={track.album_image} alt={track.name} className="h-full w-full" />
+        ) : (
+          <div className="h-full w-full bg-secondary/60 flex items-center justify-center">
+            <Music2 className="h-8 w-8 text-muted-foreground/40" />
+          </div>
+        )}
+        {/* Play overlay */}
+        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors duration-200 flex items-center justify-center">
+          <div className={cn(
+            'h-10 w-10 rounded-full bg-primary/90 flex items-center justify-center shadow-xl',
+            'opacity-0 group-hover:opacity-100 transition-all duration-200 scale-75 group-hover:scale-100'
+          )}>
+            {isActive && isPlaying ? (
+              <Pause className="h-4 w-4 text-primary-foreground" />
+            ) : (
+              <Play className="h-4 w-4 text-primary-foreground ml-0.5" />
+            )}
+          </div>
+        </div>
+        {/* Active indicator */}
+        {isActive && isPlaying && (
+          <div className="absolute bottom-1.5 left-1/2 -translate-x-1/2 flex gap-[2px]">
+            {[1, 2, 3].map(i => (
+              <span key={i} className="w-[3px] bg-primary animate-pulse rounded-full" style={{ height: `${4 + i * 2}px`, animationDelay: `${i * 0.15}s` }} />
+            ))}
+          </div>
+        )}
+      </div>
+      <p className={cn('text-[13px] font-semibold truncate mt-2', isActive ? 'text-primary' : 'text-foreground')}>{track.name}</p>
+      <p className="text-[11px] text-muted-foreground truncate">{track.artist_name}</p>
+    </motion.button>
+  );
+});
+TrackCard.displayName = 'TrackCard';
+
+/* ─── Trending Card (visually strongest) ───────────────────────── */
+const TrendingCard = memo(({ track, tracks, index }: { track: Track; tracks: Track[]; index: number }) => {
+  const { play, currentTrack, isPlaying } = usePlayer();
+  const isActive = currentTrack?.id === track.id;
+
+  return (
+    <motion.button
+      whileTap={{ scale: 0.96 }}
+      whileHover={{ y: -6 }}
+      transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+      onClick={() => play(track, tracks)}
+      className="flex-shrink-0 snap-start w-[160px] sm:w-[180px] text-left group"
+    >
+      <div className="relative h-[160px] sm:h-[180px] rounded-2xl overflow-hidden shadow-xl shadow-black/40">
+        {track.album_image ? (
+          <ImgFade src={track.album_image} alt={track.name} className="h-full w-full" />
+        ) : (
+          <div className="h-full w-full bg-secondary/60 flex items-center justify-center">
+            <Music2 className="h-8 w-8 text-muted-foreground/40" />
+          </div>
+        )}
+        {/* Gradient overlay */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
+        {/* Trending badge */}
+        <div className="absolute top-2 left-2 flex items-center gap-1 px-2 py-0.5 rounded-full bg-orange-500/90 backdrop-blur-sm">
+          <Flame className="h-3 w-3 text-white" />
+          <span className="text-[10px] font-bold text-white">#{index + 1}</span>
+        </div>
+        {/* Play button overlay */}
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className={cn(
+            'h-11 w-11 rounded-full bg-primary/90 flex items-center justify-center shadow-2xl',
+            'opacity-0 group-hover:opacity-100 transition-all duration-200 scale-75 group-hover:scale-100'
+          )}>
+            {isActive && isPlaying ? (
+              <Pause className="h-4.5 w-4.5 text-primary-foreground" />
+            ) : (
+              <Play className="h-4.5 w-4.5 text-primary-foreground ml-0.5" />
+            )}
+          </div>
+        </div>
+        {/* Bottom text */}
+        <div className="absolute bottom-2.5 left-2.5 right-2.5">
+          <p className={cn('text-[13px] font-bold truncate text-white drop-shadow-md', isActive && 'text-primary')}>
+            {track.name}
+          </p>
+          <p className="text-[11px] text-white/70 truncate">{track.artist_name}</p>
+        </div>
+      </div>
+    </motion.button>
+  );
+});
+TrendingCard.displayName = 'TrendingCard';
+
+/* ─── Carousel Skeleton ────────────────────────────────────────── */
+const CarouselSkeleton = ({ count = 5, h = 'h-[150px]' }: { count?: number; h?: string }) => (
+  <div className="flex gap-3 overflow-hidden">
+    {Array.from({ length: count }).map((_, i) => (
+      <div key={i} className="flex-shrink-0 w-[150px] sm:w-[165px] space-y-2">
+        <div className={cn('rounded-2xl shimmer', h)} />
+        <div className="h-3 w-4/5 rounded shimmer" />
+        <div className="h-2.5 w-3/5 rounded shimmer" />
+      </div>
+    ))}
+  </div>
+);
+
+/* ─── Category Card (modernized) ──────────────────────────────── */
+const CategoryCard = memo(({ cat, onClick }: { cat: typeof CATEGORIES[0]; onClick: () => void }) => (
   <motion.button
-    whileTap={{ scale: 0.97 }}
+    whileTap={{ scale: 0.96 }}
     onClick={onClick}
     className={cn(
-      'relative overflow-hidden rounded-xl h-[88px] bg-gradient-to-br text-left transition-shadow',
-      'shadow-lg hover:shadow-xl',
-      tile.gradient,
+      'relative overflow-hidden rounded-xl h-[60px] text-left',
+      'bg-gradient-to-br backdrop-blur-sm',
+      'shadow-md shadow-black/20 hover:shadow-lg hover:shadow-black/30',
+      'transition-shadow duration-200',
+      cat.gradient,
     )}
   >
-    <span className="absolute left-3.5 top-3 text-[15px] font-bold text-white drop-shadow-md">{tile.name}</span>
-    <span className="absolute right-2 bottom-1.5 text-3xl opacity-60 rotate-[-15deg]">{tile.emoji}</span>
+    <div className="absolute inset-0 bg-black/10 backdrop-blur-[1px]" />
+    <span className="relative z-10 absolute left-3 top-1/2 -translate-y-1/2 text-[13px] font-bold text-white drop-shadow-md">
+      {cat.name}
+    </span>
   </motion.button>
 ));
-FeaturedTile.displayName = 'FeaturedTile';
+CategoryCard.displayName = 'CategoryCard';
 
-/* ─── Discover Card ────────────────────────────────────────────── */
-const DiscoverCard = memo(({ card, onClick }: { card: typeof DISCOVER_CARDS[0]; onClick: () => void }) => (
-  <motion.button
-    whileTap={{ scale: 0.97 }}
-    onClick={onClick}
-    className="flex-shrink-0 w-[150px] sm:w-[170px] group"
-  >
-    <div className="relative h-[150px] sm:h-[170px] rounded-xl overflow-hidden bg-secondary/60 shadow-lg group-hover:shadow-xl transition-shadow">
-      <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/70" />
-      <div className="absolute inset-0 flex items-center justify-center text-5xl opacity-40">{card.img}</div>
-      <span className="absolute bottom-2.5 left-3 right-3 text-[13px] font-bold text-white leading-tight drop-shadow-md">
-        {card.title}
-      </span>
-    </div>
-  </motion.button>
-));
-DiscoverCard.displayName = 'DiscoverCard';
-
-/* ─── Genre Card ───────────────────────────────────────────────── */
-const GenreCard = memo(({ genre, active, onClick }: {
-  genre: typeof GENRES[0]; active: boolean; onClick: () => void;
-}) => (
-  <motion.button
-    whileTap={{ scale: 0.97 }}
-    onClick={onClick}
-    className={cn(
-      'relative overflow-hidden rounded-xl h-[92px] text-left transition-all duration-200',
-      'shadow-md hover:shadow-lg',
-      active && 'ring-2 ring-white/40',
-    )}
-    style={{ background: genre.bg }}
-  >
-    <span className="absolute left-3.5 bottom-3 text-[15px] font-bold text-white drop-shadow-md">{genre.name}</span>
-  </motion.button>
-));
-GenreCard.displayName = 'GenreCard';
-
-/* ─── Background matching Home ─────────────────────────────────── */
+/* ─── Background matching themes ───────────────────────────────── */
 const SearchBackground = memo(({ theme }: { theme: string }) => {
   if (theme === 'oled') return <div className="fixed inset-0 bg-black -z-10" />;
   if (theme === 'obsidian') return (
@@ -165,14 +276,12 @@ const SearchPage = () => {
   const [query, setQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [selectedGenre, setSelectedGenre] = useState<string | null>(null);
-  const [recents, setRecents] = useState<string[]>(getRecents());
+  const [recents, setRecents] = useState<RecentItem[]>(getRecents());
   const [isFocused, setIsFocused] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
-  const { downloadedTracks } = useOfflineTracks();
   const isOnline = useIsOnline();
   const { user } = useAuth();
   const { theme } = useTheme();
-  const { play } = usePlayer();
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -181,10 +290,11 @@ const SearchPage = () => {
         addRecent(query);
         setRecents(getRecents());
       }
-    }, 300);
+    }, 350);
     return () => clearTimeout(timer);
   }, [query]);
 
+  // Search results
   const { data: ytResults, isLoading: ytLoading, error: ytError, refetch: retrySearch } = useQuery({
     queryKey: ['yt-search', debouncedQuery],
     queryFn: () => searchYTMusic(debouncedQuery, 20, true),
@@ -193,6 +303,15 @@ const SearchPage = () => {
     retry: 1,
   });
 
+  // Save first result track data to recents
+  useEffect(() => {
+    if (ytResults && ytResults.length > 0 && debouncedQuery.length >= 2) {
+      addRecent(debouncedQuery, ytResults[0]);
+      setRecents(getRecents());
+    }
+  }, [ytResults, debouncedQuery]);
+
+  // Genre results
   const { data: genreTracks, isLoading: loadingGenre } = useQuery({
     queryKey: ['genre-yt', selectedGenre],
     queryFn: () => getTracksByGenreYT(selectedGenre!, 20),
@@ -200,19 +319,25 @@ const SearchPage = () => {
     staleTime: 5 * 60 * 1000,
   });
 
+  // Trending tracks
+  const { data: trendingTracks, isLoading: loadingTrending } = useQuery({
+    queryKey: ['search-trending'],
+    queryFn: () => getTrendingYT(15),
+    staleTime: 10 * 60 * 1000,
+    enabled: isOnline,
+  });
+
+  // Most played / popular
+  const { data: mostPlayed, isLoading: loadingMostPlayed } = useQuery({
+    queryKey: ['search-most-played'],
+    queryFn: () => searchYTMusic('most played songs 2025 popular', 15),
+    staleTime: 10 * 60 * 1000,
+    enabled: isOnline,
+  });
+
   const showResults = debouncedQuery.length >= 2;
   const showGenreResults = selectedGenre && !showResults;
   const showDiscovery = !showResults && !showGenreResults;
-
-  const handleDiscoverClick = useCallback((searchQuery: string) => {
-    setQuery(searchQuery);
-    setSelectedGenre(null);
-  }, []);
-
-  const handleGenreClick = useCallback((name: string) => {
-    setSelectedGenre(name);
-    setQuery('');
-  }, []);
 
   const handleRecentClick = useCallback((q: string) => {
     setQuery(q);
@@ -224,9 +349,9 @@ const SearchPage = () => {
     setRecents([]);
   }, []);
 
-  const handleFeaturedClick = useCallback((name: string) => {
-    setQuery(name.toLowerCase());
-    setSelectedGenre(null);
+  const handleGenreClick = useCallback((name: string) => {
+    setSelectedGenre(name);
+    setQuery('');
   }, []);
 
   const userInitial = user?.email?.[0]?.toUpperCase() || '?';
@@ -237,61 +362,80 @@ const SearchPage = () => {
 
       <div className="relative min-h-screen pb-32">
         {/* Sticky Header */}
-        <div className="sticky top-0 z-20 pt-3 pb-2 px-4 sm:px-6"
+        <div
+          className="sticky top-0 z-20 pt-3 pb-3 px-4 sm:px-6"
           style={{
-            background: 'linear-gradient(180deg, hsl(var(--background)) 70%, transparent 100%)',
+            background: 'linear-gradient(180deg, hsl(var(--background)) 75%, hsl(var(--background) / 0) 100%)',
           }}
         >
           <div className="max-w-5xl mx-auto space-y-3">
             {/* Top row */}
-            <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
               <Avatar className="h-8 w-8 bg-secondary border border-border/30">
                 <AvatarFallback className="text-xs font-bold text-foreground bg-secondary">
                   {userInitial}
                 </AvatarFallback>
               </Avatar>
               <h1 className="text-2xl font-extrabold text-foreground tracking-tight">Search</h1>
-              <button className="p-2 rounded-full text-muted-foreground hover:text-foreground transition-colors opacity-50">
-                <Camera className="h-5 w-5" />
-              </button>
             </div>
 
-            {/* Search bar */}
-            <div className={cn(
-              'relative transition-all duration-200',
-              isFocused && 'scale-[1.01]',
-            )}>
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-[18px] w-[18px] text-muted-foreground" />
-              <input
-                ref={inputRef}
-                value={query}
-                onChange={e => { setQuery(e.target.value); setSelectedGenre(null); }}
-                onFocus={() => setIsFocused(true)}
-                onBlur={() => setIsFocused(false)}
-                placeholder="What do you want to listen to?"
-                className={cn(
-                  'w-full h-12 pl-11 pr-10 rounded-xl text-[15px] font-medium',
-                  'bg-secondary/70 text-foreground placeholder:text-muted-foreground/60',
-                  'border border-border/20 outline-none',
-                  'transition-all duration-200',
-                  isFocused && 'bg-secondary/90 border-border/40 shadow-lg shadow-black/20',
-                )}
-              />
-              {query && (
-                <button
-                  onClick={() => { setQuery(''); setDebouncedQuery(''); inputRef.current?.focus(); }}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 rounded-full hover:bg-muted/50 transition-colors"
-                >
-                  <X className="h-4 w-4 text-muted-foreground" />
-                </button>
+            {/* Premium search bar */}
+            <motion.div
+              animate={isFocused ? { scale: 1.015 } : { scale: 1 }}
+              transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+              className="relative"
+            >
+              {/* Glow ring on focus */}
+              {isFocused && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="absolute -inset-[2px] rounded-2xl"
+                  style={{
+                    background: 'linear-gradient(135deg, hsl(var(--glow-soft) / 0.25), hsl(var(--glow-soft) / 0.08), hsl(var(--glow-soft) / 0.2))',
+                    filter: 'blur(4px)',
+                  }}
+                />
               )}
-            </div>
+              <div className={cn(
+                'relative flex items-center gap-3 h-[52px] px-4 rounded-2xl',
+                'glass-strong',
+                'transition-all duration-300',
+                isFocused && 'shadow-lg shadow-black/30',
+              )}>
+                <Search className={cn(
+                  'h-[18px] w-[18px] flex-shrink-0 transition-colors duration-200',
+                  isFocused ? 'text-foreground' : 'text-muted-foreground',
+                )} />
+                <input
+                  ref={inputRef}
+                  value={query}
+                  onChange={e => { setQuery(e.target.value); setSelectedGenre(null); }}
+                  onFocus={() => setIsFocused(true)}
+                  onBlur={() => setIsFocused(false)}
+                  placeholder="Search songs, artists, albums…"
+                  className={cn(
+                    'flex-1 bg-transparent text-[15px] font-medium text-foreground',
+                    'placeholder:text-muted-foreground/50 outline-none',
+                  )}
+                />
+                {query && (
+                  <button
+                    onClick={() => { setQuery(''); setDebouncedQuery(''); inputRef.current?.focus(); }}
+                    className="p-1.5 rounded-full hover:bg-muted/50 transition-colors"
+                  >
+                    <X className="h-4 w-4 text-muted-foreground" />
+                  </button>
+                )}
+              </div>
+            </motion.div>
           </div>
         </div>
 
         {/* Content */}
-        <div className="px-4 sm:px-6 pt-2">
-          <div className="max-w-5xl mx-auto space-y-7">
+        <div className="px-4 sm:px-6 pt-1">
+          <div className="max-w-5xl mx-auto space-y-8">
 
             {/* Search results */}
             <AnimatePresence mode="wait">
@@ -322,15 +466,15 @@ const SearchPage = () => {
                   {loadingGenre ? (
                     <div className="space-y-2">
                       {Array.from({ length: 5 }).map((_, i) => (
-                        <div key={i} className="h-16 rounded-xl bg-secondary/30 animate-pulse" />
+                        <div key={i} className="h-16 rounded-xl shimmer" />
                       ))}
                     </div>
                   ) : genreTracks && genreTracks.length > 0 ? (
-                    <div className="rounded-2xl overflow-hidden bg-secondary/20 backdrop-blur-sm">
+                    <div className="rounded-2xl overflow-hidden glass">
                       <YTSearchResults tracks={genreTracks} isLoading={false} error={null} onRetry={() => {}} query={selectedGenre!} />
                     </div>
                   ) : (
-                    <div className="rounded-2xl p-8 text-center bg-secondary/20">
+                    <div className="rounded-2xl p-8 text-center glass">
                       <p className="text-sm text-muted-foreground">No tracks found for this genre</p>
                     </div>
                   )}
@@ -341,62 +485,75 @@ const SearchPage = () => {
             {/* Discovery sections */}
             {showDiscovery && (
               <>
-                {/* Recent Searches */}
+                {/* 1. Recent Searches */}
                 {recents.length > 0 && (
                   <Section
-                    title="Recent searches"
+                    title="Recent Searches"
                     delay={0}
                     right={
                       <button onClick={handleClearRecents} className="flex items-center gap-1 text-[12px] text-muted-foreground hover:text-foreground transition-colors">
-                        <Trash2 className="h-3 w-3" />
-                        Clear
+                        <Trash2 className="h-3 w-3" /> Clear
                       </button>
                     }
                   >
-                    <div className="flex flex-wrap gap-2">
-                      {recents.map(r => (
+                    <HCarousel>
+                      {recents.map((r, i) => (
                         <motion.button
-                          key={r}
-                          whileTap={{ scale: 0.95 }}
-                          onClick={() => handleRecentClick(r)}
-                          className="flex items-center gap-1.5 px-3.5 py-2 rounded-full bg-secondary/60 text-[13px] font-medium text-foreground hover:bg-secondary/90 transition-colors min-h-[36px]"
+                          key={`${r.query}-${i}`}
+                          whileTap={{ scale: 0.96 }}
+                          whileHover={{ scale: 1.03 }}
+                          onClick={() => handleRecentClick(r.query)}
+                          className="flex-shrink-0 snap-start w-[120px] text-left group"
                         >
-                          <Clock className="h-3 w-3 text-muted-foreground flex-shrink-0" />
-                          <span className="truncate max-w-[140px]">{r}</span>
+                          <div className="relative h-[120px] rounded-2xl overflow-hidden shadow-md shadow-black/20">
+                            {r.track?.image ? (
+                              <ImgFade src={r.track.image} alt={r.query} className="h-full w-full" />
+                            ) : (
+                              <div className="h-full w-full bg-secondary/50 flex items-center justify-center">
+                                <Clock className="h-6 w-6 text-muted-foreground/40" />
+                              </div>
+                            )}
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
+                          </div>
+                          <p className="text-[12px] font-semibold text-foreground truncate mt-1.5">{r.track?.name || r.query}</p>
+                          <p className="text-[10px] text-muted-foreground truncate">{r.track?.artist || r.query}</p>
                         </motion.button>
                       ))}
-                    </div>
+                    </HCarousel>
                   </Section>
                 )}
 
-                {/* Start browsing */}
-                <Section title="Start browsing" delay={0.05}>
-                  <div className="grid grid-cols-2 gap-3">
-                    {FEATURED_TILES.map(tile => (
-                      <FeaturedTile key={tile.name} tile={tile} onClick={() => handleFeaturedClick(tile.name)} />
-                    ))}
-                  </div>
+                {/* 2. Most Played */}
+                <Section title="Most Played" delay={0.05}>
+                  {loadingMostPlayed ? (
+                    <CarouselSkeleton />
+                  ) : mostPlayed && mostPlayed.length > 0 ? (
+                    <HCarousel>
+                      {mostPlayed.map(track => (
+                        <TrackCard key={track.id} track={track} tracks={mostPlayed} />
+                      ))}
+                    </HCarousel>
+                  ) : null}
                 </Section>
 
-                {/* Discover something new */}
-                <Section title="Discover something new" delay={0.1}>
-                  <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide snap-x snap-mandatory" style={{ scrollbarWidth: 'none' }}>
-                    {DISCOVER_CARDS.map(card => (
-                      <DiscoverCard key={card.title} card={card} onClick={() => handleDiscoverClick(card.query)} />
-                    ))}
-                  </div>
+                {/* 3. Trending Right Now — visually strongest */}
+                <Section title="Trending Right Now 🔥" delay={0.1}>
+                  {loadingTrending ? (
+                    <CarouselSkeleton h="h-[180px]" />
+                  ) : trendingTracks && trendingTracks.length > 0 ? (
+                    <HCarousel>
+                      {trendingTracks.map((track, i) => (
+                        <TrendingCard key={track.id} track={track} tracks={trendingTracks} index={i} />
+                      ))}
+                    </HCarousel>
+                  ) : null}
                 </Section>
 
-                {/* Browse all */}
-                <Section title="Browse all" delay={0.15}>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                    {GENRES.map(genre => (
-                      <GenreCard
-                        key={genre.name}
-                        genre={genre}
-                        active={selectedGenre === genre.name}
-                        onClick={() => handleGenreClick(genre.name)}
-                      />
+                {/* 4. Browse by Categories (modernized) */}
+                <Section title="Browse Categories" delay={0.15}>
+                  <div className="grid grid-cols-2 gap-2.5">
+                    {CATEGORIES.map(cat => (
+                      <CategoryCard key={cat.name} cat={cat} onClick={() => handleGenreClick(cat.name)} />
                     ))}
                   </div>
                 </Section>

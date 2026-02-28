@@ -11,7 +11,7 @@ import { motion, AnimatePresence, PanInfo } from 'framer-motion';
 import { useState, useRef, useCallback, useEffect, memo, useMemo } from 'react';
 
 /* ─── Marquee Text ───────────────────────────────────────────────── */
-const MarqueeText = memo(({ text, className }: { text: string; className?: string }) => {
+const MarqueeText = memo(({ text, className, forceScroll = false }: { text: string; className?: string; forceScroll?: boolean }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const textRef = useRef<HTMLSpanElement>(null);
   const [shouldScroll, setShouldScroll] = useState(false);
@@ -23,17 +23,16 @@ const MarqueeText = memo(({ text, className }: { text: string; className?: strin
       const textEl = textRef.current;
       if (!container || !textEl) return;
       const overflow = textEl.scrollWidth > container.clientWidth + 2;
-      setShouldScroll(overflow);
-      if (overflow) {
-        // ~40px/s scroll speed
-        setScrollDuration(Math.max(4, textEl.scrollWidth / 40));
+      setShouldScroll(forceScroll || overflow);
+      if (forceScroll || overflow) {
+        setScrollDuration(Math.max(5, textEl.scrollWidth / 35));
       }
     };
     check();
     const ro = new ResizeObserver(check);
     if (containerRef.current) ro.observe(containerRef.current);
     return () => ro.disconnect();
-  }, [text]);
+  }, [text, forceScroll]);
 
   return (
     <div
@@ -737,9 +736,9 @@ export const PlayerBar = () => {
                 </div>
               )}
             </motion.div>
-            <div className="min-w-0">
-              <MarqueeText text={currentTrack.name} className="text-[13px] font-semibold text-white tracking-tight" />
-              <MarqueeText text={currentTrack.artist_name} className="text-[11px] text-amber-300/60 mt-0.5" />
+            <div className="min-w-0 max-w-[45vw] sm:max-w-[200px]">
+              <MarqueeText text={currentTrack.name} className="text-[13px] font-semibold text-white tracking-tight" forceScroll />
+              <MarqueeText text={currentTrack.artist_name} className="text-[11px] text-amber-300/60 mt-0.5" forceScroll />
             </div>
           </button>
 

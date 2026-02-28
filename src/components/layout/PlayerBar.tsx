@@ -7,7 +7,69 @@ import {
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { motion, AnimatePresence, PanInfo } from 'framer-motion';
-import { useState, useRef, useCallback, useEffect, memo } from 'react';
+import { useState, useRef, useCallback, useEffect, memo, useMemo } from 'react';
+
+/* ─── Marquee Text ───────────────────────────────────────────────── */
+const MarqueeText = memo(({ text, className }: { text: string; className?: string }) => {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const textRef = useRef<HTMLSpanElement>(null);
+  const [shouldScroll, setShouldScroll] = useState(false);
+  const [scrollDuration, setScrollDuration] = useState(8);
+
+  useEffect(() => {
+    const check = () => {
+      const container = containerRef.current;
+      const textEl = textRef.current;
+      if (!container || !textEl) return;
+      const overflow = textEl.scrollWidth > container.clientWidth + 2;
+      setShouldScroll(overflow);
+      if (overflow) {
+        // ~40px/s scroll speed
+        setScrollDuration(Math.max(4, textEl.scrollWidth / 40));
+      }
+    };
+    check();
+    const ro = new ResizeObserver(check);
+    if (containerRef.current) ro.observe(containerRef.current);
+    return () => ro.disconnect();
+  }, [text]);
+
+  return (
+    <div
+      ref={containerRef}
+      className="overflow-hidden whitespace-nowrap relative"
+      style={{
+        maskImage: shouldScroll
+          ? 'linear-gradient(90deg, transparent 0%, black 6%, black 94%, transparent 100%)'
+          : undefined,
+        WebkitMaskImage: shouldScroll
+          ? 'linear-gradient(90deg, transparent 0%, black 6%, black 94%, transparent 100%)'
+          : undefined,
+      }}
+    >
+      <span
+        ref={textRef}
+        className={cn(className, shouldScroll && 'inline-block')}
+        style={
+          shouldScroll
+            ? {
+                animation: `marquee-scroll ${scrollDuration}s linear 1.2s infinite`,
+                willChange: 'transform',
+              }
+            : undefined
+        }
+      >
+        {text}
+        {shouldScroll && (
+          <span className="inline-block" style={{ paddingLeft: '3em' }}>
+            {text}
+          </span>
+        )}
+      </span>
+    </div>
+  );
+});
+MarqueeText.displayName = 'MarqueeText';
 import { useAuth } from '@/hooks/useAuth';
 import { useLikedSongs, useLikeTrack } from '@/hooks/useLibrary';
 import { SleepTimerPopover } from '@/components/SleepTimerPopover';
@@ -494,7 +556,7 @@ export const PlayerBar = () => {
                 className="flex items-start justify-between mb-4"
               >
                 <div className="min-w-0 flex-1 mr-4">
-                  <p className="text-xl font-bold text-white truncate tracking-tight leading-tight">{currentTrack.name}</p>
+                  <MarqueeText text={currentTrack.name} className="text-xl font-bold text-white tracking-tight leading-tight" />
                   <p className="text-[15px] text-white/50 truncate mt-0.5 font-normal">{currentTrack.artist_name}</p>
                 </div>
                 {user && (
@@ -612,7 +674,7 @@ export const PlayerBar = () => {
               )}
             </motion.div>
             <div className="min-w-0">
-              <p className="text-[13px] font-semibold truncate text-white tracking-tight">{currentTrack.name}</p>
+              <MarqueeText text={currentTrack.name} className="text-[13px] font-semibold text-white tracking-tight" />
               <p className="text-[11px] truncate text-white/35 mt-0.5">{currentTrack.artist_name}</p>
             </div>
           </button>

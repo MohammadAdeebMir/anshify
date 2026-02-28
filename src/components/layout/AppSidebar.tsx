@@ -30,7 +30,7 @@ export const AppSidebar = () => {
         <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center glow-primary">
           <Music2 className="h-4 w-4 text-primary-foreground" />
         </div>
-        <span className="text-lg font-bold tracking-tight text-foreground">Purple Haze</span>
+        <span className="text-lg font-bold tracking-tight text-foreground">Anshify</span>
       </div>
 
       <ScrollArea className="flex-1 px-3">

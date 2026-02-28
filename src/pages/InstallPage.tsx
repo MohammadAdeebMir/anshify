@@ -61,7 +61,7 @@ const InstallPage = () => {
       >
         {/* App icon */}
         <div className="mx-auto w-24 h-24 rounded-2xl overflow-hidden shadow-2xl shadow-primary/20">
-          <img src="/pwa-512.png" alt="Anshify" className="w-full h-full object-cover" />
+          <img src="/logo.png" alt="Anshify" className="w-full h-full object-cover" />
         </div>
 
         <div>

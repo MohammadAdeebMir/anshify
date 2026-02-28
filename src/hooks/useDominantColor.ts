@@ -32,12 +32,10 @@ function rgbToHsl(r: number, g: number, b: number): [number, number, number] {
   return [Math.round(h * 360), Math.round(s * 100), Math.round(l * 100)];
 }
 
-/** Snap to pure, rich hue colors with proper depth */
+/** Pure bright colors — maximum vibrancy */
 function adjustColor(r: number, g: number, b: number): [number, number, number] {
-  const [h, s] = rgbToHsl(r, g, b);
-  // Use exact hue, boost saturation to full, lightness at 45 for rich deep tones
-  const adjS = Math.max(s, 100);
-  return hslToRgb(h, adjS, 45);
+  const [h] = rgbToHsl(r, g, b);
+  return hslToRgb(h, 100, 55); // full saturation, bright lightness
 }
 
 function hslToRgb(h: number, s: number, l: number): [number, number, number] {

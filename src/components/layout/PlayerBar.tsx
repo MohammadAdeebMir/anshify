@@ -694,7 +694,7 @@ export const PlayerBar = () => {
         animate={{ y: 0, opacity: 1 }}
         exit={{ y: 100, opacity: 0 }}
         transition={{ type: 'spring', damping: 28, stiffness: 260 }}
-        className={cn('fixed left-0 right-0 z-30', isMobile ? 'bottom-14' : 'bottom-0')}
+        className={cn('fixed z-30', isMobile ? 'bottom-16 left-2 right-2' : 'bottom-2 left-3 right-3')}
         drag="y"
         dragConstraints={{ top: 0, bottom: 0 }}
         dragElastic={0.3}
@@ -704,11 +704,12 @@ export const PlayerBar = () => {
           }
         }}
       >
-        <div className="absolute inset-0 rounded-t-xl overflow-hidden"
+        <div className="absolute inset-0 rounded-2xl overflow-hidden"
           style={{
-            background: `linear-gradient(135deg, rgba(${cr},${cg},${cb},0.85) 0%, rgba(${Math.round(cr*0.6)},${Math.round(cg*0.6)},${Math.round(cb*0.6)},0.9) 100%)`,
+            background: `linear-gradient(135deg, rgba(${cr},${cg},${cb},0.88) 0%, rgba(${Math.round(cr*0.5)},${Math.round(cg*0.5)},${Math.round(cb*0.5)},0.92) 100%)`,
             backdropFilter: 'blur(40px)', WebkitBackdropFilter: 'blur(40px)',
-            borderTop: '1px solid rgba(255,255,255,0.1)',
+            border: '1px solid rgba(255,255,255,0.08)',
+            boxShadow: '0 8px 32px rgba(0,0,0,0.5), 0 2px 8px rgba(0,0,0,0.3)',
             transition: 'background 500ms ease',
           }}
         />
@@ -720,7 +721,7 @@ export const PlayerBar = () => {
         )}
 
         <motion.div
-          className={cn('flex items-center gap-3 px-3 sm:px-5 relative z-10', isMobile ? 'h-[60px]' : 'h-[68px]')}
+          className={cn('flex items-center gap-3 px-4 sm:px-5 relative z-10', isMobile ? 'h-[64px]' : 'h-[68px]')}
         >
           <button onClick={() => isMobile && setExpanded(true)} className="flex items-center gap-3 flex-1 min-w-0 text-left">
             <motion.div

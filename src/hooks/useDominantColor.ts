@@ -37,9 +37,9 @@ function adjustColor(r: number, g: number, b: number): [number, number, number] 
   const [h, s, l] = rgbToHsl(r, g, b);
   // Target lightness: 30-50 range — rich and visible, not muddy
   let adjL = l;
-  if (l > 60) adjL = 30 + (l - 60) * 0.25;
-  else if (l < 20) adjL = 20 + l * 0.6; // lift too-dark more aggressively
-  else adjL = Math.max(28, Math.min(50, l));
+  if (l > 90) adjL = 75 + (l - 90) * 0.3;
+  else if (l < 30) adjL = 30 + l * 0.8; // lift darks aggressively
+  else adjL = Math.max(55, Math.min(80, l)); // bright range 55-80
 
   // Boost saturation more aggressively for vivid colors
   let adjS = s;

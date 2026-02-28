@@ -385,19 +385,19 @@ const SearchPage = () => {
                 'relative flex items-center gap-3 h-[52px] px-4 rounded-2xl',
                 'transition-all duration-300',
                 isFocused
-                  ? 'shadow-[0_0_20px_rgba(255,255,255,0.12)]'
-                  : 'shadow-[0_0_10px_rgba(255,255,255,0.05)]',
+                  ? 'shadow-[0_0_12px_rgba(255,255,255,0.06)]'
+                  : '',
               )}
               style={{
                 background: isFocused
-                  ? 'hsl(0 0% 92%)'
-                  : 'hsl(0 0% 85%)',
+                  ? 'hsl(0 0% 18%)'
+                  : 'hsl(0 0% 15%)',
                 border: isFocused
-                  ? '1px solid hsl(0 0% 100% / 0.6)'
-                  : '1px solid hsl(0 0% 70% / 0.3)',
+                  ? '1px solid hsl(0 0% 30% / 0.5)'
+                  : '1px solid hsl(0 0% 22% / 0.4)',
               }}
               >
-                <Search className="h-[18px] w-[18px] flex-shrink-0 text-black/50" />
+                <Search className="h-[18px] w-[18px] flex-shrink-0 text-muted-foreground" />
                 <input
                   ref={inputRef}
                   value={query}
@@ -405,14 +405,14 @@ const SearchPage = () => {
                   onFocus={() => setIsFocused(true)}
                   onBlur={() => setIsFocused(false)}
                   placeholder="Search songs, artists, albums…"
-                  className="flex-1 bg-transparent text-[15px] font-medium text-black placeholder:text-black/40 outline-none"
+                  className="flex-1 bg-transparent text-[15px] font-medium text-foreground placeholder:text-muted-foreground/60 outline-none"
                 />
                 {query && (
                   <button
                     onClick={() => { setQuery(''); setDebouncedQuery(''); inputRef.current?.focus(); }}
-                    className="p-1.5 rounded-full hover:bg-black/10 transition-colors"
+                    className="p-1.5 rounded-full hover:bg-muted/50 transition-colors"
                   >
-                    <X className="h-4 w-4 text-black/40" />
+                    <X className="h-4 w-4 text-muted-foreground" />
                   </button>
                 )}
               </div>

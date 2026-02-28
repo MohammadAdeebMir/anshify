@@ -11,10 +11,19 @@ function getProxyUrl(endpoint: string, params: Record<string, string>): string {
 }
 
 async function getProxyHeaders(): Promise<Record<string, string>> {
-  const { data: { session } } = await supabase.auth.getSession();
-  const token = session?.access_token || SUPABASE_KEY;
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.access_token) {
+      return {
+        'Authorization': `Bearer ${session.access_token}`,
+        'apikey': SUPABASE_KEY,
+      };
+    }
+  } catch {
+    // Not logged in, use anon key
+  }
   return {
-    'Authorization': `Bearer ${token}`,
+    'Authorization': `Bearer ${SUPABASE_KEY}`,
     'apikey': SUPABASE_KEY,
   };
 }

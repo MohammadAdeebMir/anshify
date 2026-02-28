@@ -25,7 +25,7 @@ import { useNavigate } from 'react-router-dom';
 import appLogo from '@/assets/logo.png';
 
 /* ─── Filter Pills ─────────────────────────────────────────────── */
-const FILTERS = ['All', 'Music', 'Podcasts'] as const;
+const FILTERS = ['All', 'Music'] as const;
 type Filter = typeof FILTERS[number];
 
 const FilterPills = memo(({ active, onChange }: { active: Filter; onChange: (f: Filter) => void }) => (

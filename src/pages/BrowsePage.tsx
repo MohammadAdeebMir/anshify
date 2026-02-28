@@ -1,4 +1,5 @@
 import { memo } from 'react';
+import { AppBackground } from '@/components/AppBackground';
 import { motion } from 'framer-motion';
 import { Radio, Play, Pause, Music2, ListMusic, Clock } from 'lucide-react';
 import { usePlayer } from '@/contexts/PlayerContext';
@@ -13,6 +14,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
 import { Heart } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useTheme } from '@/contexts/ThemeContext';
 
 /* ─── Track Row ────────────────────────────────────────────────── */
 const TrackRow = ({ track, tracks, index }: { track: Track; tracks: Track[]; index: number }) => {
@@ -94,6 +96,7 @@ PlaylistCard.displayName = 'PlaylistCard';
 /* ─── Main BrowsePage ──────────────────────────────────────────── */
 const BrowsePage = () => {
   const { user } = useAuth();
+  const { theme } = useTheme();
 
   // Most listened songs from listening_stats
   const { data: mostListened, isLoading: loadingMostListened } = useQuery({
@@ -176,6 +179,8 @@ const BrowsePage = () => {
   const { likedSongs } = useLikedSongs();
 
   return (
+    <>
+    <AppBackground theme={theme} />
     <div className="p-6 md:p-8 space-y-8 max-w-7xl mx-auto pb-32">
       <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
         <div className="flex items-center gap-2 mb-2">
@@ -252,6 +257,7 @@ const BrowsePage = () => {
         </motion.section>
       )}
     </div>
+    </>
   );
 };
 

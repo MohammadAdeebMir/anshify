@@ -21,7 +21,7 @@ interface AdminStats {
   totalPlaylists: number;
   topArtists: { artist_name: string; play_count: number }[];
   topTracks: { track_name: string; artist_name: string; play_count: number }[];
-  recentUsers: { display_name: string | null; avatar_url: string | null; created_at: string; total_listens: number; streak_days: number }[];
+  recentUsers: { label: string; created_at: string; total_listens: number; streak_days: number }[];
   dailyPlays: Record<string, number>;
 }
 
@@ -285,14 +285,10 @@ const SecretAdminPage = () => {
                   <div key={i} className="flex items-center justify-between py-1.5 border-b border-border/10 last:border-0">
                     <div className="flex items-center gap-3">
                       <div className="h-8 w-8 rounded-full bg-muted flex items-center justify-center overflow-hidden">
-                        {u.avatar_url ? (
-                          <img src={u.avatar_url} alt="" className="h-full w-full object-cover" />
-                        ) : (
-                          <Users className="h-4 w-4 text-muted-foreground" />
-                        )}
+                        <Users className="h-4 w-4 text-muted-foreground" />
                       </div>
                       <div>
-                        <p className="text-sm font-medium text-foreground">{u.display_name || 'Anonymous'}</p>
+                        <p className="text-sm font-medium text-foreground">{u.label}</p>
                         <p className="text-[10px] text-muted-foreground">
                           Joined {new Date(u.created_at).toLocaleDateString()} · {u.total_listens} listens · {u.streak_days}d streak
                         </p>

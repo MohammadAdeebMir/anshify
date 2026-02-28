@@ -4,6 +4,7 @@ import { Track } from '@/types/music';
 import { usePlayer } from '@/contexts/PlayerContext';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
+import { useHDArtwork } from '@/hooks/useHDArtwork';
 
 interface ContinueListeningProps {
   tracks: Track[];
@@ -21,6 +22,23 @@ export const ContinueListening = ({ tracks }: ContinueListeningProps) => {
         return <ContinueCard key={track.id} track={track} tracks={tracks} index={i} isActive={isActive} isPlaying={isPlaying} onPlay={() => play(track, tracks)} onPause={pause} />;
       })}
     </div>
+  );
+};
+
+const ContinueImg = ({ track, onLoad, imgLoaded }: { track: Track; onLoad: () => void; imgLoaded: boolean }) => {
+  const hdSrc = useHDArtwork(track.id, track.album_image, track.name, track.artist_name);
+  return (
+    <img
+      src={hdSrc}
+      alt={track.name}
+      onLoad={onLoad}
+      className={cn(
+        'h-full w-full object-cover transition-all duration-500 group-hover:scale-105',
+        imgLoaded ? 'opacity-100' : 'opacity-0'
+      )}
+      loading="lazy"
+      decoding="async"
+    />
   );
 };
 
@@ -48,17 +66,7 @@ const ContinueCard = ({
           <div className="absolute inset-0 bg-muted animate-pulse" />
         )}
         {track.album_image ? (
-          <img
-            src={track.album_image}
-            alt={track.name}
-            onLoad={() => setImgLoaded(true)}
-            className={cn(
-              'h-full w-full object-cover transition-all duration-500 group-hover:scale-105',
-              imgLoaded ? 'opacity-100' : 'opacity-0'
-            )}
-            loading="lazy"
-            decoding="async"
-          />
+          <ContinueImg track={track} onLoad={() => setImgLoaded(true)} imgLoaded={imgLoaded} />
         ) : (
           <div className="h-full w-full bg-muted flex items-center justify-center">
             <Play className="h-6 w-6 text-muted-foreground" />

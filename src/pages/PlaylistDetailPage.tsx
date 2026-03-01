@@ -219,7 +219,7 @@ const PlaylistDetailPage = () => {
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
           onPointerCancel={handlePointerUp}
-          className="glass rounded-2xl overflow-hidden"
+          className="glass rounded-2xl overflow-hidden touch-none"
         >
           {orderedItems.map((t, i) => (
             <TrackRow

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Play, Pause, Heart, Download, AlertCircle, RefreshCw } from 'lucide-react';
+import { Play, Pause, Heart, Download, AlertCircle, RefreshCw, ListPlus } from 'lucide-react';
 import { Track } from '@/types/music';
 import { usePlayer } from '@/contexts/PlayerContext';
 import { useAuth } from '@/hooks/useAuth';
@@ -10,6 +10,7 @@ import { useOfflineTracks } from '@/hooks/useOffline';
 import { cn } from '@/lib/utils';
 import { SongListSkeleton } from '@/components/skeletons/Skeletons';
 import { useHDArtwork } from '@/hooks/useHDArtwork';
+import { toast } from 'sonner';
 
 // Crossfade image loader with HD artwork
 const ImgFade = ({ src, alt, trackId, trackName, artistName }: { src: string; alt: string; trackId?: string; trackName?: string; artistName?: string }) => {
@@ -31,7 +32,7 @@ const ImgFade = ({ src, alt, trackId, trackName, artistName }: { src: string; al
 };
 
 const YTTrackRow = ({ track, tracks, index }: { track: Track; tracks: Track[]; index: number }) => {
-  const { play, currentTrack, isPlaying } = usePlayer();
+  const { play, currentTrack, isPlaying, addToQueue } = usePlayer();
   const { user } = useAuth();
   const { likedSongs } = useLikedSongs();
   const { isLiked, toggleLike } = useLikeTrack();
@@ -39,6 +40,11 @@ const YTTrackRow = ({ track, tracks, index }: { track: Track; tracks: Track[]; i
   const isActive = currentTrack?.id === track.id;
   const liked = isLiked(track.id, likedSongs);
   const downloaded = isDownloaded(track.id);
+
+  const handleAddToQueue = () => {
+    addToQueue(track);
+    toast.success(`Added "${track.name}" to queue`);
+  };
 
   return (
     <motion.div
@@ -82,22 +88,31 @@ const YTTrackRow = ({ track, tracks, index }: { track: Track; tracks: Track[]; i
           <p className="text-xs text-muted-foreground truncate mt-0.5">{track.artist_name}</p>
         </div>
       </button>
-      {user && (
-        <div className="flex items-center gap-0.5">
-          <button
-            onClick={() => toggleLike.mutate({ track, liked })}
-            className={cn('p-2 rounded-full transition-colors', liked ? 'text-primary' : 'text-muted-foreground hover:text-foreground')}
-          >
-            <Heart className={cn('h-4 w-4', liked && 'fill-current')} />
-          </button>
-          <AddToPlaylistButton track={track} />
-          {!downloaded && (
-            <button onClick={() => download.mutate(track)} className="p-2 text-muted-foreground hover:text-foreground transition-colors">
-              <Download className="h-3.5 w-3.5" />
+      <div className="flex items-center gap-0.5">
+        <button
+          onClick={handleAddToQueue}
+          className="p-2 rounded-full text-muted-foreground hover:text-foreground transition-colors"
+          title="Add to queue"
+        >
+          <ListPlus className="h-4 w-4" />
+        </button>
+        {user && (
+          <>
+            <button
+              onClick={() => toggleLike.mutate({ track, liked })}
+              className={cn('p-2 rounded-full transition-colors', liked ? 'text-primary' : 'text-muted-foreground hover:text-foreground')}
+            >
+              <Heart className={cn('h-4 w-4', liked && 'fill-current')} />
             </button>
-          )}
-        </div>
-      )}
+            <AddToPlaylistButton track={track} />
+            {!downloaded && (
+              <button onClick={() => download.mutate(track)} className="p-2 text-muted-foreground hover:text-foreground transition-colors">
+                <Download className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </>
+        )}
+      </div>
       {track.duration > 0 && (
         <span className="text-xs text-muted-foreground tabular-nums">
           {Math.floor(track.duration / 60)}:{String(track.duration % 60).padStart(2, '0')}

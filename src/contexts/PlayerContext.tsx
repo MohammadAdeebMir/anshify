@@ -168,20 +168,40 @@ export const PlayerProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     return () => cancelAnimationFrame(rafId);
   }, [yt]);
 
-  // Media Session API
+  // Media Session API — provide multiple artwork sizes for crisp system notification
   useEffect(() => {
     if (!('mediaSession' in navigator)) return;
     const ms = navigator.mediaSession;
     if (state.currentTrack) {
+      const imgSrc = state.currentTrack.album_image || '';
+      const artworkSizes: MediaImage[] = imgSrc
+        ? [
+            { src: imgSrc, sizes: '96x96', type: 'image/jpeg' },
+            { src: imgSrc, sizes: '128x128', type: 'image/jpeg' },
+            { src: imgSrc, sizes: '256x256', type: 'image/jpeg' },
+            { src: imgSrc, sizes: '512x512', type: 'image/jpeg' },
+          ]
+        : [];
       ms.metadata = new MediaMetadata({
         title: state.currentTrack.name,
         artist: state.currentTrack.artist_name,
-        album: state.currentTrack.album_name,
-        artwork: state.currentTrack.album_image ? [{ src: state.currentTrack.album_image, sizes: '512x512', type: 'image/jpeg' }] : [],
+        album: state.currentTrack.album_name || 'Anshify',
+        artwork: artworkSizes,
       });
     }
     ms.playbackState = state.isPlaying ? 'playing' : 'paused';
-  }, [state.currentTrack, state.isPlaying]);
+
+    // Set position state for smooth progress bar in system notification
+    if (state.currentTrack && state.duration > 0) {
+      try {
+        ms.setPositionState({
+          duration: state.duration,
+          position: Math.min(state.progress, state.duration),
+          playbackRate: 1.0,
+        });
+      } catch { /* some browsers don't support setPositionState */ }
+    }
+  }, [state.currentTrack, state.isPlaying, state.duration, state.progress]);
 
   useEffect(() => {
     if (!('mediaSession' in navigator)) return;

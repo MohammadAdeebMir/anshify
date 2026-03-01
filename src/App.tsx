@@ -30,6 +30,7 @@ import InstallPage from "./pages/InstallPage";
 import InsightsPage from "./pages/InsightsPage";
 import CreatePage from "./pages/CreatePage";
 import RecentsPage from "./pages/RecentsPage";
+import JamPage from "./pages/JamPage";
 
 const queryClient = new QueryClient();
 
@@ -60,6 +61,7 @@ const App = () => (
                 <Route path="/queue" element={<QueuePage />} />
                 <Route path="/insights" element={<InsightsPage />} />
                 <Route path="/create" element={<CreatePage />} />
+                <Route path="/jam/:id" element={<JamPage />} />
                 <Route path="/recents" element={<RecentsPage />} />
               </Route>
               <Route path="/auth" element={<AuthPage />} />

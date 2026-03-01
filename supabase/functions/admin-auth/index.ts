@@ -9,7 +9,7 @@ const corsHeaders = {
 // Simple in-memory rate limiter for login attempts
 const loginAttempts = new Map<string, { count: number; resetAt: number }>();
 const RATE_LIMIT_MAX = 5;
-const RATE_LIMIT_WINDOW_MS = 60_000; // 1 minute
+const RATE_LIMIT_WINDOW_MS = 60_000;
 
 function isRateLimited(key: string): boolean {
   const now = Date.now();
@@ -71,9 +71,8 @@ Deno.serve(async (req) => {
       });
     }
 
-    // ── Optional: verify admin credentials on login action ──
+    // ── Login action ──
     if (action === "login") {
-      // Rate limit login attempts by user ID
       if (isRateLimited(userId as string)) {
         return new Response(JSON.stringify({ error: "Too many login attempts. Try again in 1 minute." }), {
           status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -101,7 +100,7 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    // ── Input validation for notifications ──
+    // ── Notification actions ──
     if (action === "send_notification") {
       if (!notificationTitle || !notificationBody) {
         return new Response(JSON.stringify({ error: "Title and body required" }), {
@@ -129,7 +128,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    // ── List notifications ──
     if (action === "list_notifications") {
       const { data } = await supabase.from("notifications")
         .select("*").order("created_at", { ascending: false }).limit(30);
@@ -138,7 +136,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    // ── Delete notification ──
     if (action === "delete_notification" && notificationId) {
       await supabase.from("notifications").delete().eq("id", notificationId);
       return new Response(JSON.stringify({ success: true }), {
@@ -146,7 +143,128 @@ Deno.serve(async (req) => {
       });
     }
 
-    // ── Default: return anonymized stats ──
+    // ── Enhanced analytics action ──
+    if (action === "analytics") {
+      const now = new Date();
+      const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+      const weekStart = new Date(now.getTime() - 7 * 86400000).toISOString();
+      const yearStart = new Date(now.getFullYear(), 0, 1).toISOString();
+
+      // Core counts
+      const [
+        { count: totalUsers },
+        { count: totalPlays },
+        { count: totalLikes },
+        { count: totalPlaylists },
+        { count: playsToday },
+        { count: playsThisWeek },
+        { count: playsThisMonth },
+      ] = await Promise.all([
+        supabase.from("profiles").select("*", { count: "exact", head: true }),
+        supabase.from("recently_played").select("*", { count: "exact", head: true }),
+        supabase.from("liked_songs").select("*", { count: "exact", head: true }),
+        supabase.from("playlists").select("*", { count: "exact", head: true }),
+        supabase.from("recently_played").select("*", { count: "exact", head: true }).gte("played_at", todayStart),
+        supabase.from("recently_played").select("*", { count: "exact", head: true }).gte("played_at", weekStart),
+        supabase.from("recently_played").select("*", { count: "exact", head: true }).gte("played_at", monthStart),
+      ]);
+
+      // DAU / MAU from recently_played (distinct user_ids)
+      const { data: dauData } = await supabase.from("recently_played")
+        .select("user_id").gte("played_at", todayStart).limit(1000);
+      const dau = new Set((dauData || []).map(r => r.user_id)).size;
+
+      const { data: mauData } = await supabase.from("recently_played")
+        .select("user_id").gte("played_at", monthStart).limit(1000);
+      const mau = new Set((mauData || []).map(r => r.user_id)).size;
+
+      // New users this month
+      const { count: newUsersMonth } = await supabase.from("profiles")
+        .select("*", { count: "exact", head: true }).gte("created_at", monthStart);
+
+      // User growth - monthly signups for current year
+      const { data: yearProfiles } = await supabase.from("profiles")
+        .select("created_at").gte("created_at", yearStart).order("created_at", { ascending: true }).limit(1000);
+      
+      const monthlyGrowth: Record<string, number> = {};
+      (yearProfiles || []).forEach(p => {
+        const key = p.created_at.substring(0, 7); // YYYY-MM
+        monthlyGrowth[key] = (monthlyGrowth[key] || 0) + 1;
+      });
+
+      // Daily plays for last 30 days
+      const thirtyDaysAgo = new Date(now.getTime() - 30 * 86400000).toISOString();
+      const { data: recentPlays } = await supabase.from("recently_played")
+        .select("played_at").gte("played_at", thirtyDaysAgo).order("played_at", { ascending: true }).limit(1000);
+      
+      const dailyPlays: Record<string, number> = {};
+      (recentPlays || []).forEach(p => {
+        const day = p.played_at.substring(0, 10);
+        dailyPlays[day] = (dailyPlays[day] || 0) + 1;
+      });
+
+      // Hourly distribution (peak hours) from last 7 days
+      const { data: weekPlays } = await supabase.from("recently_played")
+        .select("played_at").gte("played_at", weekStart).limit(1000);
+      
+      const hourlyDist = new Array(24).fill(0);
+      (weekPlays || []).forEach(p => {
+        const hour = new Date(p.played_at).getHours();
+        hourlyDist[hour]++;
+      });
+
+      // Listening time estimate (minutes) - aggregate
+      const totalListeningMinutes = Math.round((totalPlays || 0) * 3.5);
+      const monthlyListeningMinutes = Math.round((playsThisMonth || 0) * 3.5);
+      const weeklyListeningMinutes = Math.round((playsThisWeek || 0) * 3.5);
+
+      // Avg songs per session estimate (group plays within 30-min windows)
+      let avgSongsPerSession = 0;
+      let avgSessionDuration = 0;
+      if (weekPlays && weekPlays.length > 1) {
+        const sorted = weekPlays.map(p => new Date(p.played_at).getTime()).sort((a, b) => a - b);
+        let sessions = 1;
+        for (let i = 1; i < sorted.length; i++) {
+          if (sorted[i] - sorted[i - 1] > 30 * 60 * 1000) sessions++;
+        }
+        avgSongsPerSession = Math.round((weekPlays.length / sessions) * 10) / 10;
+        avgSessionDuration = Math.round((weekPlays.length * 3.5) / sessions);
+      }
+
+      // Top artists (aggregated, no user-level data)
+      const { data: topArtists } = await supabase.from("listening_stats")
+        .select("artist_name, play_count")
+        .order("play_count", { ascending: false }).limit(10);
+
+      // Top tracks (aggregated)
+      const { data: topTracks } = await supabase.from("listening_stats")
+        .select("track_name, artist_name, play_count")
+        .order("play_count", { ascending: false }).limit(10);
+
+      return new Response(JSON.stringify({
+        totalUsers: totalUsers || 0,
+        dau,
+        mau,
+        newUsersMonth: newUsersMonth || 0,
+        totalPlays: totalPlays || 0,
+        totalLikes: totalLikes || 0,
+        totalPlaylists: totalPlaylists || 0,
+        playsToday: playsToday || 0,
+        totalListeningMinutes,
+        monthlyListeningMinutes,
+        weeklyListeningMinutes,
+        monthlyGrowth,
+        dailyPlays,
+        hourlyDist,
+        avgSongsPerSession,
+        avgSessionDuration,
+        topArtists: topArtists || [],
+        topTracks: topTracks || [],
+      }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    // ── Default: return basic stats (legacy) ──
     const now = new Date();
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
@@ -164,7 +282,6 @@ Deno.serve(async (req) => {
     const { data: topArtists } = await supabase.from("listening_stats").select("artist_name, play_count").order("play_count", { ascending: false }).limit(10);
     const { data: topTracks } = await supabase.from("listening_stats").select("track_name, artist_name, play_count").order("play_count", { ascending: false }).limit(10);
 
-    // Anonymized recent signups: only show join date and aggregate stats, no PII
     const { data: rawRecentUsers } = await supabase.from("profiles")
       .select("created_at, total_listens, streak_days")
       .order("created_at", { ascending: false }).limit(10);

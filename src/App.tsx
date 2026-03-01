@@ -25,6 +25,7 @@ import StoragePage from "./pages/StoragePage";
 import QueuePage from "./pages/QueuePage";
 import SecretAdminPage from "./pages/SecretAdminPage";
 import AdminNotifyPage from "./pages/AdminNotifyPage";
+import AdminAnalyticsPage from "./pages/AdminAnalyticsPage";
 import NotFound from "./pages/NotFound";
 import InstallPage from "./pages/InstallPage";
 import InsightsPage from "./pages/InsightsPage";
@@ -68,6 +69,7 @@ const App = () => (
               <Route path="/reset-password" element={<ResetPasswordPage />} />
               <Route path="/admin-x9k2m" element={<SecretAdminPage />} />
               <Route path="/admin-notify-x9k2m" element={<AdminNotifyPage />} />
+              <Route path="/console-r8k3m7q2x-admin" element={<AdminAnalyticsPage />} />
               <Route path="/install" element={<InstallPage />} />
               <Route path="*" element={<NotFound />} />
             </Routes>

@@ -2,16 +2,33 @@ import { usePlayer } from '@/contexts/PlayerContext';
 import {
   Play, Pause, SkipBack, SkipForward, VolumeX, Volume2,
   Shuffle, Repeat, Repeat1, Timer, ChevronDown, Heart,
-  ListMusic, Loader2, RotateCcw, Music2, Share2, MoreHorizontal,
-  Moon, X
+  ListMusic, Loader2, RotateCcw, Music2, Share2,
+  X, Mic2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { motion, AnimatePresence, PanInfo } from 'framer-motion';
-import { useState, useRef, useCallback, useEffect, memo, useMemo } from 'react';
+import { useState, useRef, useCallback, useEffect, memo } from 'react';
+import { useAuth } from '@/hooks/useAuth';
+import { useLikedSongs, useLikeTrack } from '@/hooks/useLibrary';
+import { SleepTimerPopover } from '@/components/SleepTimerPopover';
+import { QueuePanel } from '@/components/QueuePanel';
+import { useDominantColor } from '@/hooks/useDominantColor';
+import { useHDArtwork } from '@/hooks/useHDArtwork';
+import { preloadArtwork } from '@/utils/artworkUtils';
+import { useLyrics, LyricLine } from '@/hooks/useLyrics';
+import { toast } from 'sonner';
+
+const formatTime = (s: number) => {
+  if (!s || !isFinite(s) || isNaN(s) || s < 0) return '0:00';
+  const clamped = Math.min(s, 86400);
+  const m = Math.floor(clamped / 60);
+  const sec = Math.floor(clamped % 60);
+  return `${m}:${sec.toString().padStart(2, '0')}`;
+};
 
 /* ─── Marquee Text ───────────────────────────────────────────────── */
-const MARQUEE_PAUSE = 5; // seconds to pause AFTER scroll completes
+const MARQUEE_PAUSE = 5;
 
 const MarqueeText = memo(({ text, className, forceScroll = false, syncDuration }: { text: string; className?: string; forceScroll?: boolean; syncDuration?: number }) => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -37,76 +54,31 @@ const MarqueeText = memo(({ text, className, forceScroll = false, syncDuration }
   }, [text, forceScroll, syncDuration]);
 
   const moveDur = syncDuration || scrollDuration;
-  // Total cycle = scroll + pause at end
   const totalDur = moveDur + MARQUEE_PAUSE;
-  // Scroll finishes at this percentage, then hold until 100%
   const scrollEndPercent = ((moveDur / totalDur) * 100).toFixed(1);
 
   return (
-    <div
-      ref={containerRef}
-      className="overflow-hidden whitespace-nowrap relative"
+    <div ref={containerRef} className="overflow-hidden whitespace-nowrap relative"
       style={{
-        maskImage: shouldScroll
-          ? 'linear-gradient(90deg, transparent 0%, black 6%, black 94%, transparent 100%)'
-          : undefined,
-        WebkitMaskImage: shouldScroll
-          ? 'linear-gradient(90deg, transparent 0%, black 6%, black 94%, transparent 100%)'
-          : undefined,
-      }}
-    >
-      <span
-        ref={textRef}
-        className={cn(className, shouldScroll && 'inline-block')}
-        style={
-          shouldScroll
-            ? {
-                animation: `marquee-dynamic ${totalDur}s linear infinite`,
-                willChange: 'transform',
-              }
-            : undefined
-        }
-      >
+        maskImage: shouldScroll ? 'linear-gradient(90deg, transparent 0%, black 6%, black 94%, transparent 100%)' : undefined,
+        WebkitMaskImage: shouldScroll ? 'linear-gradient(90deg, transparent 0%, black 6%, black 94%, transparent 100%)' : undefined,
+      }}>
+      <span ref={textRef} className={cn(className, shouldScroll && 'inline-block')}
+        style={shouldScroll ? { animation: `marquee-dynamic ${totalDur}s linear infinite`, willChange: 'transform' } : undefined}>
         {text}
-        {shouldScroll && (
-          <span className="inline-block" style={{ paddingLeft: '3em' }}>
-            {text}
-          </span>
-        )}
+        {shouldScroll && <span className="inline-block" style={{ paddingLeft: '3em' }}>{text}</span>}
       </span>
       {shouldScroll && (
-        <style>{`
-          @keyframes marquee-dynamic {
-            0% { transform: translateX(0); }
-            ${scrollEndPercent}% { transform: translateX(-50%); }
-            100% { transform: translateX(-50%); }
-          }
-        `}</style>
+        <style>{`@keyframes marquee-dynamic { 0% { transform: translateX(0); } ${scrollEndPercent}% { transform: translateX(-50%); } 100% { transform: translateX(-50%); } }`}</style>
       )}
     </div>
   );
 });
 MarqueeText.displayName = 'MarqueeText';
-import { useAuth } from '@/hooks/useAuth';
-import { useLikedSongs, useLikeTrack } from '@/hooks/useLibrary';
-import { SleepTimerPopover } from '@/components/SleepTimerPopover';
-import { QueuePanel } from '@/components/QueuePanel';
-import { useDominantColor } from '@/hooks/useDominantColor';
-import { useHDArtwork } from '@/hooks/useHDArtwork';
-import { preloadArtwork } from '@/utils/artworkUtils';
-
-const formatTime = (s: number) => {
-  if (!s || !isFinite(s) || isNaN(s) || s < 0) return '0:00';
-  const clamped = Math.min(s, 86400);
-  const m = Math.floor(clamped / 60);
-  const sec = Math.floor(clamped % 60);
-  return `${m}:${sec.toString().padStart(2, '0')}`;
-};
 
 /* ─── Slim Seek Bar ──────────────────────────────────────────────── */
 const SlimSeekBar = memo(({ progress, duration, onSeek, isBuffering, accentColor }: {
-  progress: number; duration: number; onSeek: (v: number) => void; isBuffering?: boolean;
-  accentColor?: string;
+  progress: number; duration: number; onSeek: (v: number) => void; isBuffering?: boolean; accentColor?: string;
 }) => {
   const barRef = useRef<HTMLDivElement>(null);
   const [dragging, setDragging] = useState(false);
@@ -131,9 +103,7 @@ const SlimSeekBar = memo(({ progress, duration, onSeek, isBuffering, accentColor
   const handlePointerMove = useCallback((e: React.PointerEvent) => {
     if (!dragging) return;
     cancelAnimationFrame(rafRef.current);
-    rafRef.current = requestAnimationFrame(() => {
-      setDragProgress(getProgressFromEvent(e.clientX));
-    });
+    rafRef.current = requestAnimationFrame(() => setDragProgress(getProgressFromEvent(e.clientX)));
   }, [dragging, getProgressFromEvent]);
 
   const handlePointerUp = useCallback((e: React.PointerEvent) => {
@@ -149,50 +119,31 @@ const SlimSeekBar = memo(({ progress, duration, onSeek, isBuffering, accentColor
 
   return (
     <div className="w-full space-y-0.5">
-      <div
-        ref={barRef}
-        className="relative h-10 flex items-center cursor-pointer touch-none"
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
-        onPointerCancel={handlePointerUp}
-      >
+      <div ref={barRef} className="relative h-10 flex items-center cursor-pointer touch-none"
+        onPointerDown={handlePointerDown} onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp} onPointerCancel={handlePointerUp}>
         <div className="absolute inset-x-0 h-[3px] bg-white/[0.1] rounded-full" />
         {isBuffering ? (
-          <motion.div
-            className="absolute left-0 h-[3px] bg-white/25 rounded-full"
+          <motion.div className="absolute left-0 h-[3px] bg-white/25 rounded-full"
             animate={{ width: ['20%', '60%', '20%'], x: ['0%', '40%', '80%'] }}
-            transition={{ repeat: Infinity, duration: 1.5, ease: 'easeInOut' }}
-          />
+            transition={{ repeat: Infinity, duration: 1.5, ease: 'easeInOut' }} />
         ) : (
-          <div
-            className="absolute left-0 h-[3px] bg-white rounded-full"
-            style={{
-              width: `${percent}%`,
-              transition: dragging ? 'none' : 'width 0.15s linear',
-              boxShadow: `0 0 8px ${glowColor}`,
-            }}
-          />
+          <div className="absolute left-0 h-[3px] bg-white rounded-full"
+            style={{ width: `${percent}%`, transition: dragging ? 'none' : 'width 0.15s linear', boxShadow: `0 0 8px ${glowColor}` }} />
         )}
         {!isBuffering && (
-          <div
-            className="absolute top-1/2 w-[3px] h-4 bg-white rounded-full pointer-events-none"
+          <div className="absolute top-1/2 w-[3px] h-4 bg-white rounded-full pointer-events-none"
             style={{
               left: `${percent}%`,
               transform: `translateX(-50%) translateY(-50%) ${dragging ? 'scaleY(1.4)' : 'scaleY(1)'}`,
               transition: dragging ? 'none' : 'left 0.15s linear, transform 0.15s ease',
               boxShadow: dragging ? `0 0 10px ${glowColor}` : 'none',
-            }}
-          />
+            }} />
         )}
       </div>
       <div className="flex justify-between px-0.5">
-        <span className="text-[11px] text-white/35 tabular-nums font-light select-none">
-          {formatTime(displayProgress)}
-        </span>
-        <span className="text-[11px] text-white/35 tabular-nums font-light select-none">
-          {formatTime(duration)}
-        </span>
+        <span className="text-[11px] text-white/35 tabular-nums font-light select-none">{formatTime(displayProgress)}</span>
+        <span className="text-[11px] text-white/35 tabular-nums font-light select-none">{formatTime(duration)}</span>
       </div>
     </div>
   );
@@ -200,9 +151,7 @@ const SlimSeekBar = memo(({ progress, duration, onSeek, isBuffering, accentColor
 SlimSeekBar.displayName = 'SlimSeekBar';
 
 /* ─── Compact Progress (Mini Player) ─────────────────────────────── */
-const CompactProgress = memo(({ progress, duration, isBuffering }: {
-  progress: number; duration: number; isBuffering?: boolean;
-}) => {
+const CompactProgress = memo(({ progress, duration, isBuffering }: { progress: number; duration: number; isBuffering?: boolean }) => {
   const percent = duration > 0 && isFinite(duration) ? Math.min(100, (progress / duration) * 100) : 0;
   return (
     <div className="w-full h-[2px] bg-white/[0.06] overflow-hidden">
@@ -219,8 +168,7 @@ CompactProgress.displayName = 'CompactProgress';
 
 /* ─── Play/Pause Button ──────────────────────────────────────────── */
 const PlayPauseBtn = memo(({ size = 'md', isPlaying, isBuffering, playbackError, onPlay, onPause, onRetry }: {
-  size?: 'sm' | 'md' | 'lg';
-  isPlaying: boolean; isBuffering: boolean; playbackError: string | null;
+  size?: 'sm' | 'md' | 'lg'; isPlaying: boolean; isBuffering: boolean; playbackError: string | null;
   onPlay: () => void; onPause: () => void; onRetry: () => void;
 }) => {
   const dims = size === 'lg' ? 'h-[68px] w-[68px]' : size === 'md' ? 'h-10 w-10' : 'h-9 w-9';
@@ -243,20 +191,11 @@ const PlayPauseBtn = memo(({ size = 'md', isPlaying, isBuffering, playbackError,
     );
   }
   return (
-    <motion.button
-      whileTap={{ scale: 0.92 }}
-      onClick={isPlaying ? onPause : onPlay}
-      className={cn(
-        dims, roundStyle, 'flex items-center justify-center',
-        size === 'lg'
-          ? 'bg-white text-black hover:bg-white/90 shadow-[0_4px_24px_rgba(255,255,255,0.15)]'
-          : 'bg-white text-black hover:bg-white/90'
-      )}
-    >
-      {isPlaying
-        ? <Pause className={cn(iconSize, 'fill-current')} />
-        : <Play className={cn(iconSize, 'fill-current ml-0.5')} />
-      }
+    <motion.button whileTap={{ scale: 0.92 }} onClick={isPlaying ? onPause : onPlay}
+      className={cn(dims, roundStyle, 'flex items-center justify-center',
+        size === 'lg' ? 'bg-white text-black hover:bg-white/90 shadow-[0_4px_24px_rgba(255,255,255,0.15)]' : 'bg-white text-black hover:bg-white/90'
+      )}>
+      {isPlaying ? <Pause className={cn(iconSize, 'fill-current')} /> : <Play className={cn(iconSize, 'fill-current ml-0.5')} />}
     </motion.button>
   );
 });
@@ -266,67 +205,106 @@ PlayPauseBtn.displayName = 'PlayPauseBtn';
 const CtrlBtn = memo(({ onClick, active, children, className: cls }: {
   onClick: () => void; active?: boolean; children: React.ReactNode; className?: string;
 }) => (
-  <motion.button
-    whileTap={{ scale: 0.82, opacity: 0.5 }}
+  <motion.button whileTap={{ scale: 0.82, opacity: 0.5 }}
     transition={{ type: 'spring', stiffness: 500, damping: 20, mass: 0.6 }}
     onClick={onClick}
-    className={cn(
-      'flex items-center justify-center min-w-[44px] min-h-[44px] transition-colors duration-200',
-      'active:bg-white/[0.08] rounded-xl',
-      active ? 'text-white' : 'text-white/40 hover:text-white/65', cls
-    )}
-  >
+    className={cn('flex items-center justify-center min-w-[44px] min-h-[44px] transition-colors duration-200',
+      'active:bg-white/[0.08] rounded-xl', active ? 'text-white' : 'text-white/40 hover:text-white/65', cls)}>
     {children}
   </motion.button>
 ));
 CtrlBtn.displayName = 'CtrlBtn';
 
 /* ─── Lyrics Bottom Sheet ──────────────────────────────────────── */
-const LyricsSheet = memo(({ open, onClose, trackName }: {
-  open: boolean; onClose: () => void; trackName: string;
+const LyricsSheet = memo(({ open, onClose, trackName, artistName, progress }: {
+  open: boolean; onClose: () => void; trackName: string; artistName: string; progress: number;
 }) => {
+  const { data: lyrics, isLoading } = useLyrics(
+    open ? trackName : undefined,
+    open ? artistName : undefined
+  );
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const activeLineRef = useRef<HTMLDivElement>(null);
+  const [userScrolling, setUserScrolling] = useState(false);
+  const userScrollTimer = useRef<number>(0);
+
+  // Auto-scroll to active line (synced lyrics)
+  useEffect(() => {
+    if (!open || !lyrics?.synced || userScrolling) return;
+    activeLineRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, [progress, open, lyrics?.synced, userScrolling]);
+
+  const handleUserScroll = useCallback(() => {
+    setUserScrolling(true);
+    clearTimeout(userScrollTimer.current);
+    userScrollTimer.current = window.setTimeout(() => setUserScrolling(false), 4000);
+  }, []);
+
+  // Find active line index for synced lyrics
+  const activeLineIndex = lyrics?.synced
+    ? lyrics.lines.reduce((acc, line, i) => (line.time <= progress ? i : acc), 0)
+    : -1;
+
   return (
     <AnimatePresence>
       {open && (
         <motion.div
-          initial={{ y: '100%' }}
-          animate={{ y: '8%' }}
-          exit={{ y: '100%' }}
+          initial={{ y: '100%' }} animate={{ y: '8%' }} exit={{ y: '100%' }}
           transition={{ type: 'spring', damping: 32, stiffness: 300 }}
-          drag="y"
-          dragConstraints={{ top: 0, bottom: 0 }}
-          dragElastic={0.2}
+          drag="y" dragConstraints={{ top: 0, bottom: 0 }} dragElastic={0.2}
           onDragEnd={(_, info) => { if (info.offset.y > 100 || info.velocity.y > 200) onClose(); }}
-          className="fixed inset-0 z-[65] rounded-t-[28px] overflow-hidden"
-          style={{ top: 0 }}
-        >
-          {/* Blurred backdrop */}
+          className="fixed inset-0 z-[65] rounded-t-[28px] overflow-hidden" style={{ top: 0 }}>
           <div className="absolute inset-0 bg-black/90 backdrop-blur-3xl" />
-
-          {/* Handle */}
           <div className="relative z-10 pt-3 pb-2 flex justify-center">
             <div className="w-10 h-1 rounded-full bg-white/20" />
           </div>
-
-          {/* Header */}
           <div className="relative z-10 px-6 pb-4 flex items-center justify-between">
             <h3 className="text-lg font-bold text-white tracking-tight">Lyrics</h3>
-            <button onClick={onClose} className="text-sm font-medium text-white/40 active:text-white/70 min-w-[44px] min-h-[44px] flex items-center justify-center">
-              Done
-            </button>
+            <button onClick={onClose} className="text-sm font-medium text-white/40 active:text-white/70 min-w-[44px] min-h-[44px] flex items-center justify-center">Done</button>
           </div>
 
-          {/* Lyrics content — empty state for now */}
-          <div className="relative z-10 flex-1 px-8 overflow-y-auto" style={{ maxHeight: '70vh' }}>
-            <div className="flex flex-col items-center justify-center py-20">
-              <div className="w-16 h-16 rounded-2xl bg-white/[0.06] flex items-center justify-center mb-5">
-                <Music2 className="h-8 w-8 text-white/20" />
+          <div ref={scrollRef} onScroll={handleUserScroll}
+            className="relative z-10 flex-1 px-8 overflow-y-auto pb-20" style={{ maxHeight: '70vh' }}>
+            {isLoading && (
+              <div className="flex items-center justify-center py-20">
+                <Loader2 className="h-6 w-6 text-white/30 animate-spin" />
               </div>
-              <p className="text-base font-semibold text-white/50 mb-1.5">No lyrics available</p>
-              <p className="text-sm text-white/25 text-center max-w-[240px] leading-relaxed">
-                Lyrics for "{trackName}" aren't available yet
-              </p>
-            </div>
+            )}
+
+            {!isLoading && !lyrics && (
+              <div className="flex flex-col items-center justify-center py-20">
+                <div className="w-16 h-16 rounded-2xl bg-white/[0.06] flex items-center justify-center mb-5">
+                  <Music2 className="h-8 w-8 text-white/20" />
+                </div>
+                <p className="text-base font-semibold text-white/50 mb-1.5">No lyrics available</p>
+                <p className="text-sm text-white/25 text-center max-w-[240px] leading-relaxed">
+                  Lyrics for "{trackName}" aren't available yet
+                </p>
+              </div>
+            )}
+
+            {!isLoading && lyrics && (
+              <div className="space-y-4 py-4">
+                {lyrics.lines.map((line, i) => {
+                  const isActive = lyrics.synced && i === activeLineIndex;
+                  return (
+                    <div key={i} ref={isActive ? activeLineRef : undefined}
+                      className={cn(
+                        'transition-all duration-300',
+                        lyrics.synced
+                          ? isActive
+                            ? 'text-white text-2xl font-bold scale-100'
+                            : i < activeLineIndex
+                              ? 'text-white/20 text-lg font-medium'
+                              : 'text-white/35 text-lg font-medium'
+                          : 'text-white/60 text-base leading-relaxed'
+                      )}>
+                      {line.text}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </motion.div>
       )}
@@ -334,6 +312,32 @@ const LyricsSheet = memo(({ open, onClose, trackName }: {
   );
 });
 LyricsSheet.displayName = 'LyricsSheet';
+
+/* ─── Share helper ──────────────────────────────────────────────── */
+async function handleShare(trackName: string, artistName: string) {
+  const shareData = {
+    title: `${trackName} - ${artistName}`,
+    text: `🎵 Listen to "${trackName}" by ${artistName} on Anshify!`,
+    url: window.location.origin,
+  };
+
+  try {
+    if (navigator.share && navigator.canShare?.(shareData)) {
+      await navigator.share(shareData);
+      return;
+    }
+  } catch (err: any) {
+    if (err.name === 'AbortError') return; // User cancelled
+  }
+
+  // Fallback: copy to clipboard
+  try {
+    await navigator.clipboard.writeText(`${shareData.text}\n${shareData.url}`);
+    toast.success('Link copied to clipboard!');
+  } catch {
+    toast.error('Could not share');
+  }
+}
 
 /* ═══════════════════════════════════════════════════════════════════
    MAIN PLAYER BAR
@@ -400,19 +404,14 @@ export const PlayerBar = () => {
   const liked = isLiked(currentTrack.id, likedSongs);
   const upcomingCount = queue.length - queueIndex - 1;
 
-  // Dynamic gradient — Spotify-level bold vertical blend
-  const { r: cr, g: cg, b: cb, sr, sg, sb } = dominantColor;
+  const { r: cr, g: cg, b: cb } = dominantColor;
   const accentGlow = `rgba(${cr},${cg},${cb},0.5)`;
-  // Smoother gradient: softer top, gentle fade to dark
-  const bgGradient = `
-    linear-gradient(180deg,
-      rgb(${Math.round(cr*0.85)},${Math.round(cg*0.85)},${Math.round(cb*0.85)}) 0%,
-      rgb(${Math.round(cr*0.7)},${Math.round(cg*0.7)},${Math.round(cb*0.7)}) 25%,
-      rgb(${Math.round(cr*0.4)},${Math.round(cg*0.4)},${Math.round(cb*0.4)}) 50%,
-      rgb(${Math.round(cr*0.15)},${Math.round(cg*0.15)},${Math.round(cb*0.15)}) 75%,
-      rgb(12,12,14) 100%
-    )
-  `;
+  const bgGradient = `linear-gradient(180deg,
+    rgb(${Math.round(cr*0.85)},${Math.round(cg*0.85)},${Math.round(cb*0.85)}) 0%,
+    rgb(${Math.round(cr*0.7)},${Math.round(cg*0.7)},${Math.round(cb*0.7)}) 25%,
+    rgb(${Math.round(cr*0.4)},${Math.round(cg*0.4)},${Math.round(cb*0.4)}) 50%,
+    rgb(${Math.round(cr*0.15)},${Math.round(cg*0.15)},${Math.round(cb*0.15)}) 75%,
+    rgb(12,12,14) 100%)`;
 
   /* ─── MOBILE FULL-SCREEN PLAYER ────────────────────────────────── */
   if (isMobile && expanded) {
@@ -422,33 +421,68 @@ export const PlayerBar = () => {
         <AnimatePresence>
           {queueOpen && (
             <motion.div
-              initial={{ y: '100%' }}
-              animate={{ y: '30%' }}
-              exit={{ y: '100%' }}
+              initial={{ y: '100%' }} animate={{ y: '30%' }} exit={{ y: '100%' }}
               transition={{ type: 'spring', damping: 30, stiffness: 280 }}
-              drag="y"
-              dragConstraints={{ top: 0, bottom: 0 }}
-              dragElastic={0.25}
+              drag="y" dragConstraints={{ top: 0, bottom: 0 }} dragElastic={0.25}
               onDragEnd={(_, info) => { if (info.offset.y > 80) setQueueOpen(false); }}
               className="fixed inset-0 z-[60] bg-black/[0.95] backdrop-blur-2xl rounded-t-[28px] pt-3"
-              style={{ top: 0 }}
-            >
+              style={{ top: 0 }}>
               <div className="w-10 h-1 rounded-full bg-white/15 mx-auto mb-5" />
               <div className="px-6 pb-3 flex items-center justify-between">
                 <h3 className="text-base font-bold text-white tracking-tight">Up Next</h3>
-                <button onClick={() => setQueueOpen(false)} className="text-white/40 text-sm font-medium min-w-[44px] min-h-[44px] flex items-center justify-center">Done</button>
+                <div className="flex items-center gap-3">
+                  {upcomingCount > 0 && (
+                    <button onClick={player.clearQueue} className="text-xs text-white/30 hover:text-white/60 transition-colors">Clear</button>
+                  )}
+                  <button onClick={() => setQueueOpen(false)} className="text-white/40 text-sm font-medium min-w-[44px] min-h-[44px] flex items-center justify-center">Done</button>
+                </div>
               </div>
-              <div className="px-6 overflow-y-auto" style={{ maxHeight: '58vh' }}>
-                {queue.slice(queueIndex + 1).map((track, i) => (
-                  <button key={`${track.id}-${i}`} onClick={() => player.play(track, queue)}
-                    className="flex items-center gap-3 w-full py-3 text-left active:opacity-50 transition-opacity">
-                    <img src={track.album_image || ''} alt="" className="w-11 h-11 rounded-lg object-cover bg-white/5" loading="lazy" />
+              {/* Queue mode indicators */}
+              <div className="px-6 pb-3 flex items-center gap-3">
+                <button onClick={player.toggleShuffle}
+                  className={cn('flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors',
+                    shuffle ? 'bg-white/15 text-white' : 'bg-white/5 text-white/30')}>
+                  <Shuffle className="h-3 w-3" /> Shuffle
+                </button>
+                <button onClick={player.toggleRepeat}
+                  className={cn('flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-colors',
+                    repeat !== 'off' ? 'bg-white/15 text-white' : 'bg-white/5 text-white/30')}>
+                  {repeat === 'one' ? <Repeat1 className="h-3 w-3" /> : <Repeat className="h-3 w-3" />}
+                  {repeat === 'off' ? 'Repeat' : repeat === 'all' ? 'Repeat All' : 'Repeat One'}
+                </button>
+              </div>
+              <div className="px-6 overflow-y-auto" style={{ maxHeight: '50vh' }}>
+                {/* Now Playing pinned */}
+                {currentTrack && (
+                  <div className="flex items-center gap-3 w-full py-3 border-b border-white/5 mb-2">
+                    <img src={currentTrack.album_image || ''} alt="" className="w-11 h-11 rounded-lg object-cover bg-white/5" loading="lazy" />
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium text-white truncate">{track.name}</p>
-                      <p className="text-xs text-white/30 truncate">{track.artist_name}</p>
+                      <p className="text-sm font-medium text-primary truncate">{currentTrack.name}</p>
+                      <p className="text-xs text-white/30 truncate">{currentTrack.artist_name}</p>
                     </div>
-                  </button>
-                ))}
+                    <div className="flex gap-[2px]">
+                      {[1,2,3].map(i => <span key={i} className="w-[2px] bg-white animate-pulse rounded-full" style={{ height: `${4+i*2}px`, animationDelay: `${i*0.12}s` }} />)}
+                    </div>
+                  </div>
+                )}
+                {queue.slice(queueIndex + 1).map((track, i) => {
+                  const realIdx = queueIndex + 1 + i;
+                  return (
+                    <div key={`${track.id}-${i}`} className="flex items-center gap-3 w-full py-3 group">
+                      <button onClick={() => player.play(track, queue)} className="flex items-center gap-3 flex-1 min-w-0 text-left active:opacity-50 transition-opacity">
+                        <img src={track.album_image || ''} alt="" className="w-11 h-11 rounded-lg object-cover bg-white/5" loading="lazy" />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium text-white truncate">{track.name}</p>
+                          <p className="text-xs text-white/30 truncate">{track.artist_name}</p>
+                        </div>
+                      </button>
+                      <button onClick={() => player.removeFromQueue(realIdx)}
+                        className="p-1.5 text-white/20 hover:text-white/60 opacity-0 group-hover:opacity-100 transition-all">
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  );
+                })}
                 {upcomingCount === 0 && <p className="text-center text-white/20 text-sm py-12">Queue is empty</p>}
               </div>
             </motion.div>
@@ -456,38 +490,22 @@ export const PlayerBar = () => {
         </AnimatePresence>
 
         {/* Lyrics Sheet */}
-        <LyricsSheet open={lyricsOpen} onClose={() => setLyricsOpen(false)} trackName={currentTrack.name} />
+        <LyricsSheet open={lyricsOpen} onClose={() => setLyricsOpen(false)}
+          trackName={currentTrack.name} artistName={currentTrack.artist_name} progress={progress} />
 
         <motion.div
-          initial={{ y: '100%' }}
-          animate={{ y: 0 }}
-          exit={{ y: '100%' }}
+          initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
           transition={{ type: 'spring', damping: 30, stiffness: 280 }}
           className="fixed inset-0 z-50 flex flex-col overflow-hidden"
-          style={{ backgroundColor: '#0a0a0c' }}
-        >
-          {/* Animated background — Spotify-level gradient */}
-          <div
-            className="absolute inset-0"
-            style={{ background: bgGradient, transition: 'background 400ms cubic-bezier(0.4,0,0.2,1)', zIndex: 0 }}
-          />
-          {/* Subtle dark overlay for text readability */}
+          style={{ backgroundColor: '#0a0a0c' }}>
+          <div className="absolute inset-0" style={{ background: bgGradient, transition: 'background 400ms cubic-bezier(0.4,0,0.2,1)', zIndex: 0 }} />
           <div className="absolute inset-0 bg-black/[0.15]" style={{ zIndex: 0 }} />
 
-          {/* Drag-down-to-close overlay */}
-          <motion.div
-            className="absolute inset-0"
-            style={{ zIndex: 1 }}
-            drag="y"
-            dragConstraints={{ top: 0, bottom: 0 }}
-            dragElastic={0.3}
-            onDragEnd={handleVerticalGesture}
-          />
+          <motion.div className="absolute inset-0" style={{ zIndex: 1 }}
+            drag="y" dragConstraints={{ top: 0, bottom: 0 }} dragElastic={0.3} onDragEnd={handleVerticalGesture} />
 
-          {/* ── Top header: centered "Now Playing" + track title ── */}
-          <div className="relative flex flex-col items-center"
-            style={{ zIndex: 2, paddingTop: 'max(env(safe-area-inset-top, 12px), 20px)' }}>
-            {/* Chevron down button - absolute left */}
+          {/* Top header */}
+          <div className="relative flex flex-col items-center" style={{ zIndex: 2, paddingTop: 'max(env(safe-area-inset-top, 12px), 20px)' }}>
             <motion.button whileTap={{ scale: 0.88, opacity: 0.5 }} onClick={() => setExpanded(false)}
               className="absolute left-4 min-w-[44px] min-h-[44px] flex items-center justify-center text-white/50"
               style={{ top: 'max(env(safe-area-inset-top, 12px), 20px)' }}>
@@ -499,57 +517,31 @@ export const PlayerBar = () => {
             </div>
           </div>
 
-          {/* ── Album art — large, immersive, centered with cinematic entrance ── */}
+          {/* Album art */}
           <motion.div
-            initial={{ scale: 0.85, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
+            initial={{ scale: 0.85, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
             transition={{ type: 'spring', stiffness: 200, damping: 22, mass: 0.8, delay: 0.1 }}
-            className="flex-1 flex items-center justify-center px-[10%] relative min-h-0 py-2" style={{ zIndex: 2 }}
-          >
-            <motion.div
-              drag="x"
-              dragConstraints={{ left: 0, right: 0 }}
-              dragElastic={0.12}
-              onDragEnd={handleArtworkSwipe}
-              onTap={handleDoubleTap}
-              className="w-[80vw] max-w-[500px] aspect-square relative"
-            >
+            className="flex-1 flex items-center justify-center px-[10%] relative min-h-0 py-2" style={{ zIndex: 2 }}>
+            <motion.div drag="x" dragConstraints={{ left: 0, right: 0 }} dragElastic={0.12}
+              onDragEnd={handleArtworkSwipe} onTap={handleDoubleTap}
+              className="w-[80vw] max-w-[500px] aspect-square relative">
               <AnimatePresence mode="wait">
-                <motion.div
-                  key={currentTrack.id}
+                <motion.div key={currentTrack.id}
                   initial={{ scale: 0.92, opacity: 0, filter: 'blur(12px)' }}
                   animate={{ scale: 1, opacity: 1, filter: 'blur(0px)' }}
                   exit={{ scale: 0.94, opacity: 0, filter: 'blur(8px)' }}
                   transition={{ duration: 0.4, ease: [0.25, 0.1, 0.25, 1] }}
-                  className="w-full h-full"
-                >
-                  {/* Subtle ambient glow — reduced from -inset-8 to -inset-4 */}
-                  <div
-                    className="absolute -inset-4 rounded-[28px] opacity-25 blur-[40px] pointer-events-none"
-                    style={{
-                      background: `radial-gradient(circle, rgba(${cr},${cg},${cb},0.4) 0%, transparent 70%)`,
-                      transition: 'background 400ms cubic-bezier(0.4,0,0.2,1)',
-                    }}
-                  />
-                  {/* Artwork card */}
+                  className="w-full h-full">
+                  <div className="absolute -inset-4 rounded-[28px] opacity-25 blur-[40px] pointer-events-none"
+                    style={{ background: `radial-gradient(circle, rgba(${cr},${cg},${cb},0.4) 0%, transparent 70%)`, transition: 'background 400ms cubic-bezier(0.4,0,0.2,1)' }} />
                   <div className="relative w-full h-full rounded-[16px] overflow-hidden shadow-[0_16px_64px_rgba(0,0,0,0.6)]">
                     {hdArtwork ? (
-                      <img
-                        src={hdArtwork}
-                        alt={currentTrack.album_name || 'Album art'}
-                        className="h-full w-full object-cover"
-                        decoding="async"
-                        style={{ imageRendering: 'auto' }}
-                      />
+                      <img src={hdArtwork} alt={currentTrack.album_name || 'Album art'} className="h-full w-full object-cover" decoding="async" />
                     ) : (
-                      <div className="h-full w-full bg-white/[0.04] flex items-center justify-center">
-                        <Music2 className="h-16 w-16 text-white/10" />
-                      </div>
+                      <div className="h-full w-full bg-white/[0.04] flex items-center justify-center"><Music2 className="h-16 w-16 text-white/10" /></div>
                     )}
                     <div className="absolute inset-0 bg-gradient-to-b from-white/[0.02] via-transparent to-black/[0.06] pointer-events-none" />
                   </div>
-
-                  {/* Buffering overlay */}
                   {isBuffering && (
                     <div className="absolute inset-0 flex items-center justify-center bg-black/25 rounded-[16px]">
                       <Loader2 className="h-10 w-10 text-white/60 animate-spin" />
@@ -557,8 +549,6 @@ export const PlayerBar = () => {
                   )}
                 </motion.div>
               </AnimatePresence>
-
-              {/* Heart burst */}
               <AnimatePresence>
                 {showHeartBurst && (
                   <motion.div initial={{ scale: 0, opacity: 1 }} animate={{ scale: 1.5, opacity: 0 }}
@@ -571,25 +561,22 @@ export const PlayerBar = () => {
             </motion.div>
           </motion.div>
 
-          {/* ── Track info + controls bottom section ── */}
+          {/* Track info + controls */}
           <div className="relative px-[8%]" style={{ zIndex: 2, paddingBottom: 'max(env(safe-area-inset-bottom, 12px), 16px)' }}>
-
-            {/* Song info row: title+artist left, share/heart/more right */}
+            {/* Song info row: title+artist left, share+heart right — ONE row, NO duplicate "…" */}
             <AnimatePresence mode="wait">
-              <motion.div
-                key={currentTrack.id + '-info'}
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -6 }}
+              <motion.div key={currentTrack.id + '-info'}
+                initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }}
                 transition={{ duration: 0.3 }}
-                className="flex items-center justify-between mb-5"
-              >
-                <div className="min-w-0 flex-1 mr-3" style={{ textShadow: `0 0 24px rgba(${cr},${cg},${cb},0.35), 0 0 48px rgba(${cr},${cg},${cb},0.12)`, transition: 'text-shadow 400ms ease' }}>
+                className="flex items-center justify-between mb-5">
+                <div className="min-w-0 flex-1 mr-3"
+                  style={{ textShadow: `0 0 24px rgba(${cr},${cg},${cb},0.35), 0 0 48px rgba(${cr},${cg},${cb},0.12)`, transition: 'text-shadow 400ms ease' }}>
                   <MarqueeText text={currentTrack.name} className="text-[20px] font-bold text-white tracking-tight leading-tight" />
                   <MarqueeText text={currentTrack.artist_name} className="text-[14px] text-white/50 mt-0.5 font-normal" />
                 </div>
                 <div className="flex items-center gap-1">
                   <motion.button whileTap={{ scale: 0.85 }}
+                    onClick={() => handleShare(currentTrack.name, currentTrack.artist_name)}
                     className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl bg-white/[0.06] active:bg-white/[0.12] transition-colors">
                     <Share2 className="h-[18px] w-[18px] text-white/50" />
                   </motion.button>
@@ -599,103 +586,78 @@ export const PlayerBar = () => {
                       <Heart className={cn('h-[18px] w-[18px] transition-colors', liked ? 'text-white fill-current' : 'text-white/50')} />
                     </motion.button>
                   )}
-                  <motion.button whileTap={{ scale: 0.85 }}
-                    className="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl bg-white/[0.06] active:bg-white/[0.12] transition-colors">
-                    <MoreHorizontal className="h-[18px] w-[18px] text-white/50" />
-                  </motion.button>
                 </div>
               </motion.div>
             </AnimatePresence>
 
-            {/* Error */}
-            {playbackError && (
-              <p className="text-xs text-red-400/80 text-center mb-3 font-medium">{playbackError}</p>
-            )}
+            {playbackError && <p className="text-xs text-red-400/80 text-center mb-3 font-medium">{playbackError}</p>}
 
             {/* Seek bar */}
             <div className="mb-4">
               <SlimSeekBar progress={progress} duration={duration} onSeek={player.seek} isBuffering={isBuffering} accentColor={accentGlow} />
             </div>
 
-            {/* Main controls — rounded square backgrounds like screenshot */}
+            {/* Main controls */}
             <div className="flex items-center justify-between px-1 mb-5">
-              <motion.button
-                whileTap={{ scale: 0.82, opacity: 0.5 }}
+              <motion.button whileTap={{ scale: 0.82, opacity: 0.5 }}
                 transition={{ type: 'spring', stiffness: 500, damping: 20, mass: 0.6 }}
                 onClick={player.toggleShuffle}
-                className={cn(
-                  'h-[52px] w-[52px] rounded-2xl flex flex-col items-center justify-center transition-all duration-150 relative',
-                  'bg-white/[0.06] active:bg-white/[0.14] backdrop-blur-sm',
-                  shuffle ? 'text-white' : 'text-white/40'
-                )}>
+                className={cn('h-[52px] w-[52px] rounded-2xl flex flex-col items-center justify-center transition-all duration-150 relative',
+                  'bg-white/[0.06] active:bg-white/[0.14] backdrop-blur-sm', shuffle ? 'text-white' : 'text-white/40')}>
                 <Shuffle className="h-[20px] w-[20px]" />
                 {shuffle && <motion.span initial={{ scale: 0 }} animate={{ scale: [1, 1.5, 1] }} transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut' }} className="absolute bottom-1.5 w-1 h-1 rounded-full bg-white" />}
               </motion.button>
 
-              <motion.button
-                whileTap={{ scale: 0.82, opacity: 0.5 }}
+              <motion.button whileTap={{ scale: 0.82, opacity: 0.5 }}
                 transition={{ type: 'spring', stiffness: 500, damping: 20, mass: 0.6 }}
                 onClick={player.previous}
                 className="h-[52px] w-[52px] rounded-2xl flex items-center justify-center bg-white/[0.06] active:bg-white/[0.14] backdrop-blur-sm text-white/70 transition-all duration-150">
                 <SkipBack className="h-6 w-6 fill-current" />
               </motion.button>
 
-              {/* Large center play button — white rounded square */}
               <PlayPauseBtn size="lg" isPlaying={isPlaying} isBuffering={isBuffering}
                 playbackError={playbackError} onPlay={player.resume} onPause={player.pause} onRetry={player.retryPlayback} />
 
-              <motion.button
-                whileTap={{ scale: 0.82, opacity: 0.5 }}
+              <motion.button whileTap={{ scale: 0.82, opacity: 0.5 }}
                 transition={{ type: 'spring', stiffness: 500, damping: 20, mass: 0.6 }}
                 onClick={player.next}
                 className="h-[52px] w-[52px] rounded-2xl flex items-center justify-center bg-white/[0.06] active:bg-white/[0.14] backdrop-blur-sm text-white/70 transition-all duration-150">
                 <SkipForward className="h-6 w-6 fill-current" />
               </motion.button>
 
-              <motion.button
-                whileTap={{ scale: 0.82, opacity: 0.5 }}
+              <motion.button whileTap={{ scale: 0.82, opacity: 0.5 }}
                 transition={{ type: 'spring', stiffness: 500, damping: 20, mass: 0.6 }}
                 onClick={player.toggleRepeat}
-                className={cn(
-                  'h-[52px] w-[52px] rounded-2xl flex flex-col items-center justify-center transition-all duration-150 relative',
-                  'bg-white/[0.06] active:bg-white/[0.14] backdrop-blur-sm',
-                  repeat !== 'off' ? 'text-white' : 'text-white/40'
-                )}>
+                className={cn('h-[52px] w-[52px] rounded-2xl flex flex-col items-center justify-center transition-all duration-150 relative',
+                  'bg-white/[0.06] active:bg-white/[0.14] backdrop-blur-sm', repeat !== 'off' ? 'text-white' : 'text-white/40')}>
                 {repeat === 'one' ? <Repeat1 className="h-[20px] w-[20px]" /> : <Repeat className="h-[20px] w-[20px]" />}
                 {repeat !== 'off' && <motion.span initial={{ scale: 0 }} animate={{ scale: [1, 1.5, 1] }} transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut' }} className="absolute bottom-1.5 w-1 h-1 rounded-full bg-white" />}
               </motion.button>
             </div>
 
-            {/* Bottom action row — Queue | Sleep | Lyrics | More */}
+            {/* Bottom action row — Queue | Sleep | Lyrics (NO duplicate "…" button) */}
             <div className="flex items-center justify-between gap-2">
-              <motion.button
-                whileTap={{ scale: 0.88, opacity: 0.5 }}
+              <motion.button whileTap={{ scale: 0.88, opacity: 0.5 }}
                 transition={{ type: 'spring', stiffness: 500, damping: 20, mass: 0.6 }}
                 onClick={() => setQueueOpen(true)}
-                className="flex items-center gap-2 h-[44px] px-4 rounded-full bg-white/[0.06] active:bg-white/[0.12] transition-all duration-150"
-              >
+                className="flex items-center gap-2 h-[44px] px-4 rounded-full bg-white/[0.06] active:bg-white/[0.12] transition-all duration-150">
                 <ListMusic className="h-4 w-4 text-white/50" />
                 <span className="text-[13px] font-medium text-white/50">Queue</span>
+                {upcomingCount > 0 && (
+                  <span className="h-4 px-1.5 rounded-full bg-white/15 text-[10px] font-bold text-white flex items-center justify-center">
+                    {upcomingCount > 9 ? '9+' : upcomingCount}
+                  </span>
+                )}
               </motion.button>
 
               <SleepTimerPopover />
 
-              <motion.button
-                whileTap={{ scale: 0.88, opacity: 0.5 }}
+              <motion.button whileTap={{ scale: 0.88, opacity: 0.5 }}
                 transition={{ type: 'spring', stiffness: 500, damping: 20, mass: 0.6 }}
                 onClick={() => setLyricsOpen(true)}
-                className="flex items-center gap-2 h-[44px] px-4 rounded-full bg-white/[0.06] active:bg-white/[0.12] transition-all duration-150"
-              >
-                <ListMusic className="h-4 w-4 text-white/50" />
+                className="flex items-center gap-2 h-[44px] px-4 rounded-full bg-white/[0.06] active:bg-white/[0.12] transition-all duration-150">
+                <Mic2 className="h-4 w-4 text-white/50" />
                 <span className="text-[13px] font-medium text-white/50">Lyrics</span>
-              </motion.button>
-
-              <motion.button
-                whileTap={{ scale: 0.82, opacity: 0.4 }}
-                transition={{ type: 'spring', stiffness: 500, damping: 20, mass: 0.6 }}
-                className="h-[44px] w-[44px] rounded-full bg-white/[0.06] active:bg-white/[0.12] flex items-center justify-center transition-all duration-150"
-              >
-                <MoreHorizontal className="h-5 w-5 text-white/40" />
               </motion.button>
             </div>
           </div>
@@ -709,8 +671,7 @@ export const PlayerBar = () => {
     <>
       <QueuePanel open={queueOpen} onClose={() => setQueueOpen(false)} />
       <motion.div
-        initial={{ y: 100, opacity: 0 }}
-        animate={{ y: 0, opacity: 1, scale: 1 }}
+        initial={{ y: 100, opacity: 0 }} animate={{ y: 0, opacity: 1, scale: 1 }}
         exit={{ y: 120, opacity: 0, scale: 0.95 }}
         transition={{ type: 'spring', damping: 26, stiffness: 240 }}
         className={cn('fixed z-40', isMobile ? 'left-2 right-2' : 'bottom-2 left-3 right-3')}
@@ -719,19 +680,11 @@ export const PlayerBar = () => {
           opacity: miniDragY > 0 ? Math.max(0.2, 1 - miniDragY / 180) : 1,
           scale: miniDragY > 0 ? Math.max(0.92, 1 - miniDragY / 800) : 1,
         }}
-        drag="y"
-        dragConstraints={{ top: -6, bottom: 0 }}
-        dragElastic={{ top: 0.08, bottom: 0.6 }}
-        dragMomentum={false}
+        drag="y" dragConstraints={{ top: -6, bottom: 0 }}
+        dragElastic={{ top: 0.08, bottom: 0.6 }} dragMomentum={false}
         dragTransition={{ bounceStiffness: 400, bounceDamping: 30 }}
         onDrag={(_, info) => setMiniDragY(Math.max(0, info.offset.y))}
-        onDragEnd={(_, info) => {
-          setMiniDragY(0);
-          if (info.offset.y > 45 || info.velocity.y > 180) {
-            player.dismissPlayer();
-          }
-        }}
-      >
+        onDragEnd={(_, info) => { setMiniDragY(0); if (info.offset.y > 45 || info.velocity.y > 180) player.dismissPlayer(); }}>
         <div className="absolute inset-0 rounded-2xl overflow-hidden"
           style={{
             background: `linear-gradient(135deg, rgba(${cr},${cg},${cb},0.88) 0%, rgba(${Math.round(cr*0.5)},${Math.round(cg*0.5)},${Math.round(cb*0.5)},0.92) 100%)`,
@@ -739,30 +692,17 @@ export const PlayerBar = () => {
             border: '1px solid rgba(255,255,255,0.08)',
             boxShadow: '0 8px 32px rgba(0,0,0,0.5), 0 2px 8px rgba(0,0,0,0.3)',
             transition: 'background 500ms ease',
-          }}
-        />
+          }} />
 
-        {isMobile && (
-          <div className="relative z-10">
-            <CompactProgress progress={progress} duration={duration} isBuffering={isBuffering} />
-          </div>
-        )}
+        {isMobile && <div className="relative z-10"><CompactProgress progress={progress} duration={duration} isBuffering={isBuffering} /></div>}
 
-        <motion.div
-          className={cn('flex items-center gap-3 px-4 sm:px-5 relative z-10', isMobile ? 'h-[68px]' : 'h-[68px]')}
-        >
+        <motion.div className={cn('flex items-center gap-3 px-4 sm:px-5 relative z-10', isMobile ? 'h-[68px]' : 'h-[68px]')}>
           <button onClick={() => isMobile && setExpanded(true)} className="flex items-center gap-3 flex-1 min-w-0 text-left">
-            <motion.div
-              layoutId="player-artwork"
-              className={cn('rounded-xl overflow-hidden flex-shrink-0 shadow-lg', isMobile ? 'h-12 w-12' : 'h-12 w-12')}
-            >
+            <motion.div layoutId="player-artwork" className="rounded-xl overflow-hidden flex-shrink-0 shadow-lg h-12 w-12">
               {hdArtwork ? (
-                <img src={hdArtwork} alt={currentTrack.album_name || ''}
-                  className="h-full w-full object-cover" loading="lazy" decoding="async" />
+                <img src={hdArtwork} alt={currentTrack.album_name || ''} className="h-full w-full object-cover" loading="lazy" decoding="async" />
               ) : (
-                <div className="h-full w-full bg-white/5 flex items-center justify-center">
-                  <Play className="h-4 w-4 text-white/20" />
-                </div>
+                <div className="h-full w-full bg-white/5 flex items-center justify-center"><Play className="h-4 w-4 text-white/20" /></div>
               )}
             </motion.div>
             <div className="min-w-0 max-w-[45vw] sm:max-w-[200px]">

@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ListMusic, Play, Trash2, ArrowLeft, Plus, Share2, Copy } from 'lucide-react';
+import { ListMusic, Play, Trash2, ArrowLeft, Plus, Copy, GripVertical } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { usePlaylists, usePlaylistSongs, useRemoveFromPlaylist } from '@/hooks/usePlaylist';
 import { usePlayer } from '@/contexts/PlayerContext';
@@ -10,14 +10,41 @@ import { Button } from '@/components/ui/button';
 import { SongListSkeleton } from '@/components/skeletons/Skeletons';
 import { PlaylistSearchAdd } from '@/components/PlaylistSearchAdd';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
+import { useQueryClient } from '@tanstack/react-query';
+import { cn } from '@/lib/utils';
 
-const TrackRow = ({ track, tracks, playlistId }: { track: Track; tracks: Track[]; playlistId: string }) => {
+const TrackRow = ({
+  track, tracks, playlistId, index,
+  dragIndex, overIndex,
+  onDragStart, onDragOver, onDragEnd,
+}: {
+  track: Track; tracks: Track[]; playlistId: string; index: number;
+  dragIndex: number | null; overIndex: number | null;
+  onDragStart: (i: number) => void; onDragOver: (i: number) => void; onDragEnd: () => void;
+}) => {
   const { play, currentTrack } = usePlayer();
   const removeFromPlaylist = useRemoveFromPlaylist();
   const isActive = currentTrack?.id === track.id;
+  const isDragging = dragIndex === index;
+  const isOver = overIndex === index && dragIndex !== index;
 
   return (
-    <div className={`flex items-center gap-3 p-3 rounded-lg transition-colors hover:bg-muted/40 group ${isActive ? 'bg-primary/10' : ''}`}>
+    <div
+      draggable
+      onDragStart={(e) => { e.dataTransfer.effectAllowed = 'move'; onDragStart(index); }}
+      onDragOver={(e) => { e.preventDefault(); onDragOver(index); }}
+      onDragEnd={onDragEnd}
+      className={cn(
+        'flex items-center gap-2 p-3 rounded-lg transition-all group select-none',
+        isActive ? 'bg-primary/10' : 'hover:bg-muted/40',
+        isDragging && 'opacity-40 scale-[0.97]',
+        isOver && 'border-t-2 border-primary',
+      )}
+    >
+      <div className="cursor-grab active:cursor-grabbing text-muted-foreground/40 hover:text-muted-foreground transition-colors touch-none">
+        <GripVertical className="h-4 w-4" />
+      </div>
       <button onClick={() => play(track, tracks)} className="flex items-center gap-3 flex-1 min-w-0 text-left">
         <div className="h-10 w-10 rounded-md overflow-hidden flex-shrink-0">
           <img src={track.album_image} alt={track.album_name} className="h-full w-full object-cover" />
@@ -48,6 +75,35 @@ const PlaylistDetailPage = () => {
   const { songs, isLoading } = usePlaylistSongs(id);
   const { play } = usePlayer();
   const [searchOpen, setSearchOpen] = useState(false);
+  const qc = useQueryClient();
+
+  // Drag state
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [overIndex, setOverIndex] = useState<number | null>(null);
+
+  const handleDragStart = useCallback((i: number) => { setDragIndex(i); setOverIndex(null); }, []);
+  const handleDragOver = useCallback((i: number) => setOverIndex(i), []);
+
+  const handleDragEnd = useCallback(async () => {
+    if (dragIndex === null || overIndex === null || dragIndex === overIndex || !id) {
+      setDragIndex(null); setOverIndex(null); return;
+    }
+
+    // Reorder locally first for optimistic UI
+    const reordered = [...songs];
+    const [moved] = reordered.splice(dragIndex, 1);
+    reordered.splice(overIndex, 0, moved);
+
+    // Update positions in DB
+    const updates = reordered.map((t, i) =>
+      supabase.from('playlist_songs').update({ position: i }).eq('playlist_id', id).eq('track_id', t.id)
+    );
+    await Promise.all(updates);
+    qc.invalidateQueries({ queryKey: ['playlist-songs', id] });
+
+    setDragIndex(null);
+    setOverIndex(null);
+  }, [dragIndex, overIndex, songs, id, qc]);
 
   const playlist = playlists.find(p => p.id === id);
 
@@ -83,39 +139,22 @@ const PlaylistDetailPage = () => {
 
         <div className="mt-4 flex items-center gap-2">
           {songs.length > 0 && (
-            <Button
-              onClick={() => play(songs[0], songs)}
-              className="rounded-xl bg-primary text-primary-foreground glow-primary"
-            >
+            <Button onClick={() => play(songs[0], songs)} className="rounded-xl bg-primary text-primary-foreground glow-primary">
               <Play className="h-4 w-4 mr-1 fill-current" /> Play All
             </Button>
           )}
-          <Button
-            onClick={() => setSearchOpen(true)}
-            variant="outline"
-            className="rounded-xl border-border/30"
-          >
+          <Button onClick={() => setSearchOpen(true)} variant="outline" className="rounded-xl border-border/30">
             <Plus className="h-4 w-4 mr-1" /> Add Songs
           </Button>
-          <Button
-            onClick={handleSharePlaylist}
-            variant="outline"
-            size="icon"
-            className="rounded-xl border-border/30"
-          >
+          <Button onClick={handleSharePlaylist} variant="outline" size="icon" className="rounded-xl border-border/30">
             <Copy className="h-4 w-4" />
           </Button>
         </div>
       </motion.div>
 
-      {/* Inline song search */}
       <AnimatePresence>
         {searchOpen && (
-          <PlaylistSearchAdd
-            playlistId={id!}
-            existingSongIds={songs.map(s => s.id)}
-            onClose={() => setSearchOpen(false)}
-          />
+          <PlaylistSearchAdd playlistId={id!} existingSongIds={songs.map(s => s.id)} onClose={() => setSearchOpen(false)} />
         )}
       </AnimatePresence>
 
@@ -123,7 +162,13 @@ const PlaylistDetailPage = () => {
         <div className="glass rounded-2xl overflow-hidden"><SongListSkeleton count={5} /></div>
       ) : songs.length > 0 ? (
         <div className="glass rounded-2xl overflow-hidden">
-          {songs.map(t => <TrackRow key={t.id} track={t} tracks={songs} playlistId={id!} />)}
+          {songs.map((t, i) => (
+            <TrackRow
+              key={t.id} track={t} tracks={songs} playlistId={id!} index={i}
+              dragIndex={dragIndex} overIndex={overIndex}
+              onDragStart={handleDragStart} onDragOver={handleDragOver} onDragEnd={handleDragEnd}
+            />
+          ))}
         </div>
       ) : (
         <div className="glass rounded-2xl p-12 text-center space-y-3">

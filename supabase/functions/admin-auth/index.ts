@@ -45,15 +45,15 @@ Deno.serve(async (req) => {
       { global: { headers: { Authorization: authHeader } } }
     );
 
-    const jwtToken = authHeader.replace("Bearer ", "");
-    const { data: claimsData, error: claimsError } = await supabaseAuth.auth.getClaims(jwtToken);
-    if (claimsError || !claimsData?.claims) {
+    // Use getUser() for reliable JWT validation
+    const { data: userData, error: userError } = await supabaseAuth.auth.getUser();
+    if (userError || !userData?.user) {
       return new Response(JSON.stringify({ error: "Invalid token" }), {
         status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const userId = claimsData.claims.sub;
+    const userId = userData.user.id;
     const serviceClient = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
@@ -73,7 +73,7 @@ Deno.serve(async (req) => {
 
     // ── Login action ──
     if (action === "login") {
-      if (isRateLimited(userId as string)) {
+      if (isRateLimited(userId)) {
         return new Response(JSON.stringify({ error: "Too many login attempts. Try again in 1 minute." }), {
           status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -95,10 +95,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-    );
+    const supabase = serviceClient;
 
     // ── Notification actions ──
     if (action === "send_notification") {
@@ -189,7 +186,7 @@ Deno.serve(async (req) => {
       
       const monthlyGrowth: Record<string, number> = {};
       (yearProfiles || []).forEach(p => {
-        const key = p.created_at.substring(0, 7); // YYYY-MM
+        const key = p.created_at.substring(0, 7);
         monthlyGrowth[key] = (monthlyGrowth[key] || 0) + 1;
       });
 
@@ -219,7 +216,7 @@ Deno.serve(async (req) => {
       const monthlyListeningMinutes = Math.round((playsThisMonth || 0) * 3.5);
       const weeklyListeningMinutes = Math.round((playsThisWeek || 0) * 3.5);
 
-      // Avg songs per session estimate (group plays within 30-min windows)
+      // Avg songs per session estimate
       let avgSongsPerSession = 0;
       let avgSessionDuration = 0;
       if (weekPlays && weekPlays.length > 1) {

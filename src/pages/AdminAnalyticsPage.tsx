@@ -1,9 +1,9 @@
-import { useState, useCallback, lazy, Suspense } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Shield, Users, Activity, Music, Heart, ListMusic, TrendingUp,
   UserPlus, BarChart3, Lock, LogOut, Loader2, Clock, Eye, EyeOff,
-  Zap, Calendar, Timer,
+  Zap, Calendar, Timer, Radio,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -47,8 +47,10 @@ const AdminAnalyticsPage = () => {
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<AnalyticsData | null>(null);
   const [sessionExpiry, setSessionExpiry] = useState<number>(0);
+  const autoRefreshRef = useRef<number>(0);
 
   const SESSION_DURATION = 30 * 60 * 1000; // 30 minutes
+  const AUTO_REFRESH_INTERVAL = 30_000; // 30 seconds
 
   const fetchAnalytics = useCallback(async () => {
     const { data: result, error } = await supabase.functions.invoke('admin-auth', {
@@ -83,13 +85,25 @@ const AdminAnalyticsPage = () => {
       setTimeout(() => {
         setAuthenticated(false);
         setData(null);
+        clearInterval(autoRefreshRef.current);
         toast.info('Session expired. Please log in again.');
       }, SESSION_DURATION);
+
+      // Auto-refresh every 30s for real-time feel
+      autoRefreshRef.current = window.setInterval(async () => {
+        try {
+          const fresh = await fetchAnalytics();
+          setData(fresh);
+        } catch { /* silent fail on auto-refresh */ }
+      }, AUTO_REFRESH_INTERVAL);
     } catch (e: any) {
       toast.error(e.message || 'Authentication failed');
     }
     setLoading(false);
   };
+
+  // Cleanup auto-refresh on unmount
+  useEffect(() => () => clearInterval(autoRefreshRef.current), []);
 
   const refresh = async () => {
     if (Date.now() > sessionExpiry) {
@@ -112,6 +126,7 @@ const AdminAnalyticsPage = () => {
     setData(null);
     setUsername('');
     setPassword('');
+    clearInterval(autoRefreshRef.current);
   };
 
   // ── LOGIN SCREEN ──
@@ -234,7 +249,13 @@ const AdminAnalyticsPage = () => {
             </div>
             <div>
               <h1 className="text-xl sm:text-2xl font-extrabold text-foreground">Admin Analytics Console</h1>
-              <p className="text-[10px] sm:text-xs text-muted-foreground">Aggregate metrics · No personal data exposed</p>
+              <div className="flex items-center gap-2">
+                <p className="text-[10px] sm:text-xs text-muted-foreground">Aggregate metrics · No personal data exposed</p>
+                <span className="flex items-center gap-1 text-[10px] text-green-400">
+                  <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+                  Live
+                </span>
+              </div>
             </div>
           </div>
           <div className="flex gap-2">

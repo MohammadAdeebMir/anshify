@@ -1,12 +1,15 @@
+import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { ListMusic, Play, Trash2, ArrowLeft } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { ListMusic, Play, Trash2, ArrowLeft, Plus, Share2, Copy } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { usePlaylists, usePlaylistSongs, useRemoveFromPlaylist } from '@/hooks/usePlaylist';
 import { usePlayer } from '@/contexts/PlayerContext';
 import { Track } from '@/types/music';
 import { Button } from '@/components/ui/button';
 import { SongListSkeleton } from '@/components/skeletons/Skeletons';
+import { PlaylistSearchAdd } from '@/components/PlaylistSearchAdd';
+import { toast } from 'sonner';
 
 const TrackRow = ({ track, tracks, playlistId }: { track: Track; tracks: Track[]; playlistId: string }) => {
   const { play, currentTrack } = usePlayer();
@@ -44,6 +47,7 @@ const PlaylistDetailPage = () => {
   const { playlists } = usePlaylists();
   const { songs, isLoading } = usePlaylistSongs(id);
   const { play } = usePlayer();
+  const [searchOpen, setSearchOpen] = useState(false);
 
   const playlist = playlists.find(p => p.id === id);
 
@@ -52,8 +56,14 @@ const PlaylistDetailPage = () => {
     return null;
   }
 
+  const handleSharePlaylist = () => {
+    const url = `${window.location.origin}/playlist/${id}`;
+    navigator.clipboard.writeText(url);
+    toast.success('Playlist link copied!');
+  };
+
   return (
-    <div className="p-6 md:p-8 space-y-6 max-w-7xl mx-auto">
+    <div className="p-6 md:p-8 space-y-6 max-w-7xl mx-auto pb-36">
       <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}>
         <button onClick={() => navigate(-1)} className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-4 transition-colors">
           <ArrowLeft className="h-4 w-4" /> Back
@@ -71,15 +81,43 @@ const PlaylistDetailPage = () => {
           </div>
         </div>
 
-        {songs.length > 0 && (
+        <div className="mt-4 flex items-center gap-2">
+          {songs.length > 0 && (
+            <Button
+              onClick={() => play(songs[0], songs)}
+              className="rounded-xl bg-primary text-primary-foreground glow-primary"
+            >
+              <Play className="h-4 w-4 mr-1 fill-current" /> Play All
+            </Button>
+          )}
           <Button
-            onClick={() => play(songs[0], songs)}
-            className="mt-4 rounded-xl bg-primary text-primary-foreground glow-primary"
+            onClick={() => setSearchOpen(true)}
+            variant="outline"
+            className="rounded-xl border-border/30"
           >
-            <Play className="h-4 w-4 mr-1 fill-current" /> Play All
+            <Plus className="h-4 w-4 mr-1" /> Add Songs
           </Button>
-        )}
+          <Button
+            onClick={handleSharePlaylist}
+            variant="outline"
+            size="icon"
+            className="rounded-xl border-border/30"
+          >
+            <Copy className="h-4 w-4" />
+          </Button>
+        </div>
       </motion.div>
+
+      {/* Inline song search */}
+      <AnimatePresence>
+        {searchOpen && (
+          <PlaylistSearchAdd
+            playlistId={id!}
+            existingSongIds={songs.map(s => s.id)}
+            onClose={() => setSearchOpen(false)}
+          />
+        )}
+      </AnimatePresence>
 
       {isLoading ? (
         <div className="glass rounded-2xl overflow-hidden"><SongListSkeleton count={5} /></div>
@@ -91,7 +129,10 @@ const PlaylistDetailPage = () => {
         <div className="glass rounded-2xl p-12 text-center space-y-3">
           <ListMusic className="h-12 w-12 text-muted-foreground/40 mx-auto" />
           <h3 className="text-lg font-semibold text-foreground">This playlist is empty</h3>
-          <p className="text-sm text-muted-foreground">Add songs from the home page or search results.</p>
+          <p className="text-sm text-muted-foreground">Click "Add Songs" above to search and add music.</p>
+          <Button onClick={() => setSearchOpen(true)} className="rounded-xl bg-primary text-primary-foreground">
+            <Plus className="h-4 w-4 mr-1" /> Add Songs
+          </Button>
         </div>
       )}
     </div>

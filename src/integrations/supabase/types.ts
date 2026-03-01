@@ -14,6 +14,115 @@ export type Database = {
   }
   public: {
     Tables: {
+      jam_participants: {
+        Row: {
+          display_name: string | null
+          id: string
+          jam_id: string
+          joined_at: string
+          user_id: string
+        }
+        Insert: {
+          display_name?: string | null
+          id?: string
+          jam_id: string
+          joined_at?: string
+          user_id: string
+        }
+        Update: {
+          display_name?: string | null
+          id?: string
+          jam_id?: string
+          joined_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "jam_participants_jam_id_fkey"
+            columns: ["jam_id"]
+            isOneToOne: false
+            referencedRelation: "jam_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      jam_queue: {
+        Row: {
+          added_at: string
+          added_by: string
+          id: string
+          jam_id: string
+          position: number
+          track_data: Json
+          track_id: string
+        }
+        Insert: {
+          added_at?: string
+          added_by: string
+          id?: string
+          jam_id: string
+          position?: number
+          track_data: Json
+          track_id: string
+        }
+        Update: {
+          added_at?: string
+          added_by?: string
+          id?: string
+          jam_id?: string
+          position?: number
+          track_data?: Json
+          track_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "jam_queue_jam_id_fkey"
+            columns: ["jam_id"]
+            isOneToOne: false
+            referencedRelation: "jam_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      jam_sessions: {
+        Row: {
+          code: string
+          created_at: string
+          current_track_data: Json | null
+          current_track_id: string | null
+          host_id: string
+          id: string
+          is_active: boolean
+          is_playing: boolean
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          current_track_data?: Json | null
+          current_track_id?: string | null
+          host_id: string
+          id?: string
+          is_active?: boolean
+          is_playing?: boolean
+          name?: string
+          updated_at?: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          current_track_data?: Json | null
+          current_track_id?: string | null
+          host_id?: string
+          id?: string
+          is_active?: boolean
+          is_playing?: boolean
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       liked_songs: {
         Row: {
           album_id: string
